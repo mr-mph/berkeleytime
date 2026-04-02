@@ -1,4 +1,5 @@
 # path in host machine. should depend on environment and be different for each mongo pod.
+# Staging: use -f values-staging.yaml (smaller memory + /data/stage/db) instead of copying this file.
 hostPath: /data/prod/db
 
 mongodb:
@@ -40,13 +41,20 @@ mongodb:
   volumePermissions:
     enabled: true
 
+  # Prod-oriented defaults; staging uses values-staging.yaml for lower limits.
+  resources:
+    limits:
+      memory: 4Gi
+    requests:
+      memory: 2Gi
+
   # Mount migrations ConfigMap at /migrations (same path as Docker Compose).
-  # When installing, set the ConfigMap name to <release-name>-migrations, e.g.:
-  #   helm upgrade bt-prod-mongo ./infra/mongo --set mongodb.extraVolumes[0].configMap.name=bt-prod-mongo-migrations
+  # ConfigMap is templates/migrations-configmap.yaml → {{ .Release.Name }}-migrations.
+  # Bitnami renders extraVolumes with tpl, so this tracks the release name without --set.
   extraVolumes:
     - name: migrations
       configMap:
-        name: "RELEASE_NAME-migrations"  # Override with --set mongodb.extraVolumes[0].configMap.name=<release-name>-migrations
+        name: "{{ .Release.Name }}-migrations"
   extraVolumeMounts:
     - name: migrations
       mountPath: /migrations
