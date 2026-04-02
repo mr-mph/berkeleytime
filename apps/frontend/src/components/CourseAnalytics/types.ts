@@ -61,19 +61,28 @@ export interface CourseOutput<I, T> {
   data: T;
   input: I;
   color: string;
+  darkColor: string;
   hidden: boolean;
   active: boolean;
 }
 
-// Ranked color palette for bar charts (max 3 classes).
-export const BAR_CHART_COLORS = [
-  "var(--blue-500)",
-  "var(--blue-300)",
-  "var(--blue-800)",
-] as const;
-
-export const LIGHT_COLORS = ["#4e79a7", "#76b7b2", "#af7aa1", "#ff9da7"];
-export const DARK_COLORS = ["#1a2a3b", "#1f3332", "#2e2233", "#3b2227"];
+export const LIGHT_COLORS = [
+  "#4EA6FA", // Blue
+  "#6ADF86", // Green
+  "#EC5186", // Pink
+  "#F9E151", // Yellow
+  "#FF8C42", // Orange
+  "#A855F7", // Purple
+];
+export const DARK_COLORS = [
+  "#132a3e", // Blue (dimmed)
+  "#1a3721", // Green (dimmed)
+  "#3b1621", // Pink (dimmed)
+  "#3e3844", // Yellow (dimmed)
+  "#3d2a1a", // Orange (dimmed)
+  "#2d1f3d", // Purple (dimmed)
+];
+export const MAX_COURSES = 6;
 
 export const getInputSearchParam = (input: Input) => {
   // Course input

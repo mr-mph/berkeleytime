@@ -4,7 +4,9 @@ MongoDB shell (mongosh) scripts to migrate data.
 
 **Docker:** The `migrations` folder is mounted at `/migrations` in the MongoDB container (see `docker-compose.yml`).
 
-**Kubernetes:** The `infra/mongo` Helm chart bundles these files in a ConfigMap and mounts them at `/migrations` in the MongoDB pod. When installing the mongo chart, set the ConfigMap name: `--set mongodb.extraVolumes[0].configMap.name=<release-name>-migrations` (e.g. `bt-prod-mongo-migrations`).
+**Kubernetes:** The `infra/mongo` Helm chart bundles these files in a ConfigMap named `<release-name>-migrations` and mounts it at `/migrations` in the MongoDB pod (see `values.yaml` → `mongodb.extraVolumes`). No extra `--set` is required for the ConfigMap name.
+
+For staging, prefer `helm upgrade ... ./infra/mongo -f ./infra/mongo/values-staging.yaml` (sets `hostPath`, smaller `mongodb.resources`, and `env: stage`). If you install from default `values.yaml` only, override `hostPath` every upgrade so the PV is not patched (e.g. `--set hostPath=/data/stage/db`).
 
 ## add-selected-plan-requirements.js
 

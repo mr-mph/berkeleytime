@@ -7,8 +7,8 @@ import {
 import {
   GradeDistributionModel,
   IGradeDistributionItem,
+  ISectionItem,
   SectionModel,
-  TermModel,
 } from "@repo/common/models";
 
 import { buildSubjectQuery } from "../../utils/subject";
@@ -72,6 +72,32 @@ export const aggregateGradeDistributions = (
 };
 
 /**
+ * Grade distribution rows are keyed by section + term + session. Querying by
+ * sectionId alone can return multiple rows (e.g. duplicate imports, bad data),
+ * which made instructor-wide aggregates disagree with term-scoped queries.
+ */
+const findGradeDistributionsForSections = async (
+  sections: Pick<ISectionItem, "sectionId" | "termId" | "sessionId">[]
+): Promise<IGradeDistributionItem[]> => {
+  if (sections.length === 0) return [];
+
+  return GradeDistributionModel.find({
+    $or: sections.map((s) => ({
+      sectionId: s.sectionId,
+      termId: s.termId,
+      sessionId: s.sessionId,
+    })),
+  }).lean();
+};
+
+export const getGradeDistributionForSections = async (
+  sections: Pick<ISectionItem, "sectionId" | "termId" | "sessionId">[]
+) => {
+  const distributions = await findGradeDistributionsForSections(sections);
+  return aggregateGradeDistributions(distributions);
+};
+
+/**
  * Fetches and aggregates grade distributions for a set of section IDs.
  * This is the canonical way to get grade distribution data — all lookups
  * resolve section IDs first, then call this function.
@@ -81,11 +107,13 @@ export const getGradeDistributionBySectionIds = async (
 ) => {
   if (sectionIds.length === 0) return aggregateGradeDistributions([]);
 
-  const distributions = await GradeDistributionModel.find({
+  const sections = await SectionModel.find({
     sectionId: { $in: sectionIds },
-  }).lean();
+  })
+    .select({ sectionId: 1, termId: 1, sessionId: 1 })
+    .lean();
 
-  return aggregateGradeDistributions(distributions);
+  return getGradeDistributionForSections(sections);
 };
 
 /**
@@ -100,16 +128,13 @@ export const getGradeDistributionsByCourseIds = async (courseIds: string[]) => {
     courseId: { $in: courseIds },
     primary: true,
   })
-    .select({ sectionId: 1, courseId: 1 })
+    .select({ sectionId: 1, courseId: 1, termId: 1, sessionId: 1 })
     .lean();
 
   if (sections.length === 0)
     return new Map<string, AggregatedGradeDistribution>();
 
-  const allSectionIds = sections.map((s) => s.sectionId);
-  const distributions = await GradeDistributionModel.find({
-    sectionId: { $in: allSectionIds },
-  }).lean();
+  const distributions = await findGradeDistributionsForSections(sections);
 
   // Build sectionId → courseId lookup
   const sectionIdToCourseId = new Map<string, string>();
@@ -149,11 +174,10 @@ export const getGradeDistributionByCourse = async (
     courseNumber: number,
     primary: true,
   })
-    .select({ sectionId: 1 })
+    .select({ sectionId: 1, termId: 1, sessionId: 1 })
     .lean();
 
-  const sectionIds = sections.map((section) => section.sectionId);
-  return getGradeDistributionBySectionIds(sectionIds);
+  return getGradeDistributionForSections(sections);
 };
 
 export const getGradeDistributionByClass = async (
@@ -175,12 +199,12 @@ export const getGradeDistributionByClass = async (
     number: sectionNumber,
     primary: true,
   })
-    .select({ sectionId: 1 })
+    .select({ sectionId: 1, termId: 1, sessionId: 1 })
     .lean();
 
   if (!section) return aggregateGradeDistributions([]);
 
-  return getGradeDistributionBySectionIds([section.sectionId]);
+  return getGradeDistributionForSections([section]);
 };
 
 export const getGradeDistributionBySemester = async (
@@ -200,11 +224,10 @@ export const getGradeDistributionBySemester = async (
     courseNumber,
     primary: true,
   })
-    .select({ sectionId: 1 })
+    .select({ sectionId: 1, termId: 1, sessionId: 1 })
     .lean();
 
-  const sectionIds = sections.map((section) => section.sectionId);
-  return getGradeDistributionBySectionIds(sectionIds);
+  return getGradeDistributionForSections(sections);
 };
 
 export const getGradeDistributionByInstructor = async (
@@ -222,13 +245,12 @@ export const getGradeDistributionByInstructor = async (
     "meetings.instructors.givenName": givenName,
     primary: true,
   })
-    .select({ sectionId: 1 })
+    .select({ sectionId: 1, termId: 1, sessionId: 1 })
     .lean();
 
   if (sections.length === 0) return aggregateGradeDistributions([]);
 
-  const sectionIds = sections.map((section) => section.sectionId);
-  return getGradeDistributionBySectionIds(sectionIds);
+  return getGradeDistributionForSections(sections);
 };
 
 export const getGradeDistributionByInstructorAndSemester = async (
@@ -252,28 +274,10 @@ export const getGradeDistributionByInstructorAndSemester = async (
     "meetings.instructors.givenName": givenName,
     primary: true,
   })
-    .select({ sectionId: 1 })
+    .select({ sectionId: 1, termId: 1, sessionId: 1 })
     .lean();
 
   if (sections.length === 0) return aggregateGradeDistributions([]);
 
-  const sectionIds = sections.map((section) => section.sectionId);
-
-  const term = await TermModel.findOne({
-    name: `${year} ${semester}`,
-  })
-    .select({ id: 1 })
-    .lean();
-
-  if (!term) return aggregateGradeDistributions([]);
-
-  const distributions = await GradeDistributionModel.find({
-    sectionId: { $in: sectionIds },
-    termId: term.id,
-    sessionId: sessionId,
-  });
-
-  if (distributions.length === 0) return aggregateGradeDistributions([]);
-
-  return aggregateGradeDistributions(distributions);
+  return getGradeDistributionForSections(sections);
 };

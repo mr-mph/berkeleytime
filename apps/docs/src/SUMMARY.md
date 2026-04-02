@@ -15,8 +15,6 @@
 
 - [Backend](./core/backend/README.md)
 
-- [BtLL](./core/BtLL/README.md)
-
 - [Data](./core/data/README.md)
 
 - [Datapuller](./core/datapuller/README.md)
@@ -35,6 +33,7 @@
  - [API Sandbox](./core/api-sandbox/README.md)
 
 - [Packages](./core/packages/README.md)
+  - [@repo/BtLL](./core/BtLL/README.md)
   - [@repo/common](./core/packages/common.md)
   - [@repo/theme](./core/packages/theme.md)
   - [@repo/shared](./core/packages/shared.md)
