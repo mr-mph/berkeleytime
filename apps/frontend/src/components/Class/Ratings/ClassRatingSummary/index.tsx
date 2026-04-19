@@ -1,22 +1,61 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { useMutation } from "@apollo/client/react";
+
 import { METRIC_ORDER, MetricName } from "@repo/shared";
 
-import { IUserRatingClass } from "@/lib/api";
+import { VOTE_REVIEW_HELPFUL } from "@/lib/api/ratings";
+import {
+  VoteReviewHelpfulMutation,
+  VoteReviewHelpfulMutationVariables,
+} from "@/lib/generated/graphql";
 
 import {
   formatDate,
   getAverageRatingColor,
   isMetricRating,
 } from "../metricsUtil";
-import styles from "./UserRatingSummary.module.scss";
+// eslint-disable-next-line css-modules/no-unused-class
+import styles from "./ClassRatingSummary.module.scss";
 
-export default function UserRatingSummary({
-  userRatings,
+export interface ClassUserReview {
+  professorName?: string | null;
+  metrics?: Array<{ metricName: MetricName; value: number }>;
+  reviewTitle?: string | null;
+  reviewContent?: string | null;
+  reviewerGrade?: string | null;
+  lastUpdated?: string | null;
+  reviewId?: string | null;
+  helpfulCount?: number | null;
+}
+
+export default function ClassRatingSummary({
+  classReview,
 }: {
-  userRatings: IUserRatingClass;
+  classReview: ClassUserReview;
 }) {
-  const ratingMetrics = userRatings.metrics.filter((metric) =>
+  const [voteHelpful] = useMutation<
+    VoteReviewHelpfulMutation,
+    VoteReviewHelpfulMutationVariables
+  >(VOTE_REVIEW_HELPFUL);
+
+  const storageKey = classReview.reviewId
+    ? `bt_helpful_${classReview.reviewId}`
+    : null;
+
+  const [hasVoted, setHasVoted] = useState(() =>
+    storageKey ? localStorage.getItem(storageKey) === "true" : false
+  );
+
+  const handleHelpful = async () => {
+    if (!classReview.reviewId || !storageKey) return;
+    const next = !hasVoted;
+    setHasVoted(next);
+    localStorage.setItem(storageKey, String(next));
+    await voteHelpful({ variables: { reviewId: classReview.reviewId } });
+  };
+
+  const ratingMetrics = (classReview.metrics ?? []).filter((metric) =>
     isMetricRating(MetricName[metric.metricName])
   );
   const metricsAverage =
@@ -31,9 +70,7 @@ export default function UserRatingSummary({
         }, 0) / ratingMetrics.length
       : null;
 
-  const rawGrade = (
-    userRatings as IUserRatingClass & { reviewerGrade?: string | null }
-  ).reviewerGrade;
+  const rawGrade = classReview.reviewerGrade;
   const displayGrade =
     rawGrade && rawGrade.toLowerCase() !== "n/a" ? rawGrade : "N/A";
 
@@ -48,16 +85,16 @@ export default function UserRatingSummary({
     const el = contentRef.current;
     if (!el) return;
     setIsOverflowing(el.scrollHeight > el.clientHeight);
-  }, [userRatings.reviewContent]);
+  }, [classReview.reviewContent]);
 
   return (
     <div className={styles.root}>
       <div className={styles.body}>
         <div className={styles.bodyLeft}>
           <div className={styles.titleDate}>
-            <h3>{userRatings.reviewTitle}</h3>
-            {userRatings.lastUpdated && (
-              <h4>{formatDate(new Date(userRatings.lastUpdated))}</h4>
+            <h3>{classReview.reviewTitle || "No title"}</h3>
+            {classReview.lastUpdated && (
+              <h4>{formatDate(new Date(classReview.lastUpdated))}</h4>
             )}
           </div>
           <div
@@ -68,7 +105,7 @@ export default function UserRatingSummary({
                 : `${styles.contentWrapper} ${styles.clamped}`
             }
           >
-            {userRatings.reviewContent || "No written review yet."}
+            {classReview.reviewContent || "No written review yet."}
             {!isExpanded && isOverflowing && (
               <button
                 className={styles.moreButton}
@@ -89,7 +126,7 @@ export default function UserRatingSummary({
           {isExpanded && (
             <div className={styles.metricsRow}>
               {METRIC_ORDER.map((metricName) => {
-                const metric = userRatings.metrics.find(
+                const metric = (classReview.metrics ?? []).find(
                   (m) => m.metricName === metricName
                 );
                 if (!metric) return null;
@@ -102,6 +139,15 @@ export default function UserRatingSummary({
               })}
             </div>
           )}
+          <div className={styles.actions}>
+            <button
+              className={`${styles.helpfulButton}${hasVoted ? ` ${styles.helpfulButtonActive}` : ""}`}
+              onClick={handleHelpful}
+            >
+              Helpful
+            </button>
+            {/* <button className={styles.reportButton}>Report</button> */}
+          </div>
         </div>
       </div>
       <div className={styles.body}>
