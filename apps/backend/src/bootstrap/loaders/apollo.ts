@@ -1,4 +1,4 @@
- import { ApolloServer } from "@apollo/server";
+import { ApolloServer } from "@apollo/server";
 import type { ApolloServerPlugin } from "@apollo/server";
 import responseCachePlugin from "@apollo/server-plugin-response-cache";
 import { ApolloServerPluginCacheControl } from "@apollo/server/plugin/cacheControl";
@@ -8,21 +8,21 @@ import {
   KeyValueCacheSetOptions,
 } from "@apollo/utils.keyvaluecache";
 import { ApolloArmor } from "@escape.tech/graphql-armor";
-import { trace, SpanStatusCode } from "@opentelemetry/api";
-import {
-  graphqlOperationDuration,
-  graphqlOperationCount,
-  graphqlErrorCount,
-  featureUsageCount,
-  cacheHitCount,
-  cacheMissCount,
-  redisCacheOpDuration,
-} from "../../lib/metrics";
-import log from "../../lib/logger";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { createHash } from "crypto";
 import { RedisClientType } from "redis";
 import { gunzipSync, gzipSync } from "zlib";
 
+import log from "../../lib/logger";
+import {
+  cacheHitCount,
+  cacheMissCount,
+  featureUsageCount,
+  graphqlErrorCount,
+  graphqlOperationCount,
+  graphqlOperationDuration,
+  redisCacheOpDuration,
+} from "../../lib/metrics";
 import { timeToNextPull } from "../../utils/cache";
 import { buildSchema } from "../graphql/buildSchema";
 
@@ -182,23 +182,6 @@ function createOtelPlugin(): ApolloServerPlugin {
     },
   };
 }
-
-/**
- * Extracts the first query name from a GraphQL operation.
- * For example, if the query is "query { catalog(...) { ... } }", this returns "catalog".
- *
- * @param operation - The parsed GraphQL operation from the request context
- * @returns The name of the first query field, or null if not found
- */
-function getOperationName(
-  operation: OperationDefinitionNode | undefined
-): string | null {
-  const firstSelection = operation?.selectionSet?.selections?.[0];
-  if (firstSelection && "name" in firstSelection)
-    return firstSelection.name.value;
-  return null;
-}
-
 
 const SESSION_COOKIE_NAME = "bt.sid";
 

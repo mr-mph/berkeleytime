@@ -6,6 +6,7 @@ import { useReadSchedules } from "@/hooks/api";
 import useUser from "@/hooks/useUser";
 
 import { useFilterContext } from "../context/FilterContext";
+// eslint-disable-next-line css-modules/no-unused-class -- shared styles from parent
 import styles from "./Filters.module.scss";
 
 export default function ScheduleConflictFilter() {
