@@ -1,7 +1,6 @@
 import { GraphQLError } from "graphql";
 
-import { StaffMemberModel } from "@repo/common/models";
-
+import { requireStaffAdmin } from "../../helpers/staffAdmin";
 import {
   TargetType,
   getClickEvents,
@@ -17,23 +16,7 @@ interface RequestContext {
 }
 
 const requireStaffMember = async (context: RequestContext) => {
-  if (!context.user?._id) {
-    throw new GraphQLError("Not authenticated", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
-
-  const staffMember = await StaffMemberModel.findOne({
-    userId: context.user._id,
-  }).lean();
-
-  if (!staffMember) {
-    throw new GraphQLError("Only staff members can perform this action", {
-      extensions: { code: "FORBIDDEN" },
-    });
-  }
-
-  return staffMember;
+  return requireStaffAdmin(context);
 };
 
 const resolvers = {

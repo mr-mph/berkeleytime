@@ -1,6 +1,8 @@
 import { GraphQLError } from "graphql";
 
-import { StaffMemberModel, TargetedMessageModel } from "@repo/common/models";
+import { TargetedMessageModel } from "@repo/common/models";
+
+import { requireStaffAdmin } from "../../helpers/staffAdmin";
 
 // Context interface for authenticated requests
 export interface TargetedMessageRequestContext {
@@ -14,23 +16,7 @@ export interface TargetedMessageRequestContext {
 export const requireStaffMember = async (
   context: TargetedMessageRequestContext
 ) => {
-  if (!context.user?._id) {
-    throw new GraphQLError("Not authenticated", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
-
-  const staffMember = await StaffMemberModel.findOne({
-    userId: context.user._id,
-  }).lean();
-
-  if (!staffMember) {
-    throw new GraphQLError("Only staff members can perform this action", {
-      extensions: { code: "FORBIDDEN" },
-    });
-  }
-
-  return staffMember;
+  return requireStaffAdmin(context);
 };
 
 // Helper to format a Mongoose document for GraphQL

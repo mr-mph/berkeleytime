@@ -10,6 +10,7 @@ import {
   CreateCuratedClassInput,
   UpdateCuratedClassInput,
 } from "../../generated-types/graphql";
+import { assertCuratedClassStaff } from "../../helpers/staffAdmin";
 import { getClass } from "../class/controller";
 import { formatClass } from "../class/formatter";
 import { ClassModule } from "../class/generated-types/module-types";
@@ -211,7 +212,7 @@ export const getCuratedClass = async (
   context: { user?: UserType },
   id: string
 ) => {
-  if (!context.user?.staff) throw new Error("Unauthorized");
+  assertCuratedClassStaff(context);
 
   const curatedClass = await CuratedClassModel.findOne({
     _id: id,
@@ -227,7 +228,7 @@ export const updateCuratedClass = async (
   id: string,
   input: UpdateCuratedClassInput
 ) => {
-  if (!context.user?.staff) throw new Error("Unauthorized");
+  assertCuratedClassStaff(context);
 
   const curatedClass = await CuratedClassModel.findOneAndUpdate(
     {
@@ -245,7 +246,7 @@ export const deleteCuratedClass = async (
   context: { user?: UserType },
   id: string
 ) => {
-  if (!context.user?.staff) throw new Error("Unauthorized");
+  assertCuratedClassStaff(context);
 
   const curatedClass = await CuratedClassModel.findOneAndDelete({
     _id: id,
@@ -259,11 +260,11 @@ export const createCuratedClass = async (
   context: { user?: UserType },
   input: CreateCuratedClassInput
 ) => {
-  if (!context.user?.staff) throw new Error("Unauthorized");
+  assertCuratedClassStaff(context);
 
   const curatedClass = await CuratedClassModel.create({
     ...input,
-    createdBy: context.user._id,
+    createdBy: context.user!._id,
     publishedAt: new Date(),
   });
 

@@ -1,7 +1,8 @@
 import { GraphQLError } from "graphql";
 
-import { RouteRedirectModel, StaffMemberModel } from "@repo/common/models";
+import { RouteRedirectModel } from "@repo/common/models";
 
+import { requireStaffAdmin } from "../../helpers/staffAdmin";
 import { formatRouteRedirect } from "./formatter";
 
 // Context interface for authenticated requests
@@ -16,23 +17,7 @@ export interface RouteRedirectRequestContext {
 export const requireStaffMember = async (
   context: RouteRedirectRequestContext
 ) => {
-  if (!context.user?._id) {
-    throw new GraphQLError("Not authenticated", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
-
-  const staffMember = await StaffMemberModel.findOne({
-    userId: context.user._id,
-  }).lean();
-
-  if (!staffMember) {
-    throw new GraphQLError("Only staff members can perform this action", {
-      extensions: { code: "FORBIDDEN" },
-    });
-  }
-
-  return staffMember;
+  return requireStaffAdmin(context);
 };
 
 export interface CreateRouteRedirectInput {

@@ -50,6 +50,11 @@ export interface Config {
   backendPublicUrl: string | undefined;
   graphqlPath: string;
   isDev: boolean;
+  /**
+   * Staff dashboard / outreach / analytics / AG curated-class admin.
+   * Off unless STAFF_ADMIN_ENABLED=true (public roster reads stay available).
+   */
+  staffAdminEnabled: boolean;
   semanticSearch: {
     url: string;
   };
@@ -85,6 +90,7 @@ export const config: Config = {
   backendPublicUrl: envOptional("BACKEND_PUBLIC_URL"),
   graphqlPath: env("GRAPHQL_PATH"),
   isDev: env("NODE_ENV") === "development",
+  staffAdminEnabled: envOptional("STAFF_ADMIN_ENABLED") === "true",
   semanticSearch: {
     url: env("SEMANTIC_SEARCH_URL"),
   },

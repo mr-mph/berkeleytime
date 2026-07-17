@@ -11,6 +11,7 @@ import {
   UpdateStaffInfoInput,
   UpsertSemesterRoleInput,
 } from "../../generated-types/graphql";
+import { requireStaffAdmin } from "../../helpers/staffAdmin";
 import {
   addEmailToStaffGroup,
   addMissingStaffEmails,
@@ -28,23 +29,7 @@ export interface StaffRequestContext {
 // Helper to verify the current user is a staff member
 // Returns the staff member record for the authenticated user
 export const requireStaffMember = async (context: StaffRequestContext) => {
-  if (!context.user?._id) {
-    throw new GraphQLError("Not authenticated", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
-
-  const staffMember = await StaffMemberModel.findOne({
-    userId: context.user._id,
-  }).lean();
-
-  if (!staffMember) {
-    throw new GraphQLError("Only staff members can perform this action", {
-      extensions: { code: "FORBIDDEN" },
-    });
-  }
-
-  return staffMember;
+  return requireStaffAdmin(context);
 };
 
 export const getStaffBySemester = async (year: number, semester: Semester) => {
@@ -73,7 +58,9 @@ export const getRoleMember = async (memberId: string) => {
   return member;
 };
 
-export const getAllUsers = async () => {
+export const getAllUsers = async (context: StaffRequestContext) => {
+  await requireStaffMember(context);
+
   const users = await UserModel.find()
     .select("_id name email")
     .sort({ name: 1 })

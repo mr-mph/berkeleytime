@@ -1,8 +1,7 @@
-import { GraphQLError } from "graphql";
-
-import { PodModel, StaffMemberModel } from "@repo/common/models";
+import { PodModel } from "@repo/common/models";
 
 import { Semester } from "../../generated-types/graphql";
+import { requireStaffAdmin } from "../../helpers/staffAdmin";
 
 // Context interface for authenticated requests
 export interface PodRequestContext {
@@ -14,23 +13,7 @@ export interface PodRequestContext {
 
 // Helper to verify the current user is a staff member
 export const requireStaffMember = async (context: PodRequestContext) => {
-  if (!context.user?._id) {
-    throw new GraphQLError("Not authenticated", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
-
-  const staffMember = await StaffMemberModel.findOne({
-    userId: context.user._id,
-  }).lean();
-
-  if (!staffMember) {
-    throw new GraphQLError("Only staff members can perform this action", {
-      extensions: { code: "FORBIDDEN" },
-    });
-  }
-
-  return staffMember;
+  return requireStaffAdmin(context);
 };
 
 export interface CreatePodInput {

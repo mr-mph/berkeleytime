@@ -21,6 +21,11 @@ function Content() {
   const { data, loading } = useReadUser();
 
   useEffect(() => {
+    if (import.meta.env.VITE_STAFF_ADMIN_ENABLED !== "true") {
+      window.location.href = BASE;
+      return;
+    }
+
     if (loading || data?.staff) return;
 
     if (!data) {

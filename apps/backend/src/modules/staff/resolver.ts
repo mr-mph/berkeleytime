@@ -36,7 +36,11 @@ const resolvers = {
     staffMemberByUserId: (_: unknown, { userId }: { userId: string }) =>
       getStaffMemberByUserId(userId),
 
-    allUsers: () => getAllUsers(),
+    allUsers: (
+      _: unknown,
+      __: unknown,
+      context: StaffRequestContext
+    ) => getAllUsers(context),
   },
 
   Mutation: {

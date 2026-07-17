@@ -6,9 +6,9 @@ import type { RedisClientType } from "redis";
 import {
   BannerModel,
   BannerViewCountModel,
-  StaffMemberModel,
 } from "@repo/common/models";
 
+import { requireStaffAdmin } from "../../helpers/staffAdmin";
 import { getClientIP } from "../../utils/ip";
 import { formatBanner } from "./formatter";
 import {
@@ -29,23 +29,7 @@ export interface BannerRequestContext {
 
 // Helper to verify the current user is a staff member
 export const requireStaffMember = async (context: BannerRequestContext) => {
-  if (!context.user?._id) {
-    throw new GraphQLError("Not authenticated", {
-      extensions: { code: "UNAUTHENTICATED" },
-    });
-  }
-
-  const staffMember = await StaffMemberModel.findOne({
-    userId: context.user._id,
-  }).lean();
-
-  if (!staffMember) {
-    throw new GraphQLError("Only staff members can perform this action", {
-      extensions: { code: "FORBIDDEN" },
-    });
-  }
-
-  return staffMember;
+  return requireStaffAdmin(context);
 };
 
 export interface CreateBannerInput {

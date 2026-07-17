@@ -39,8 +39,29 @@ export default function App() {
     userId: user?._id ?? null,
   });
 
+  // Staff admin is disabled unless the backend enables STAFF_ADMIN_ENABLED.
+  // Fail closed on the frontend so the dashboard never mounts.
+  const staffAdminEnabled =
+    import.meta.env.VITE_STAFF_ADMIN_ENABLED === "true";
+
   const isLoading = userLoading || (user && staffLoading);
   const isNotStaff = user && !staffLoading && !staffMember;
+
+  if (!staffAdminEnabled) {
+    return (
+      <ThemeProvider forcedTheme="dark">
+        <div className={styles.signInContainer}>
+          <h1 className={styles.heading}>Staff Dashboard</h1>
+          <p className={styles.errorText}>
+            Staff admin features are disabled on this deployment.
+          </p>
+          <a href={BASE} className={styles.returnLink}>
+            Return to Bt
+          </a>
+        </div>
+      </ThemeProvider>
+    );
+  }
 
   if (isLoading) {
     return (

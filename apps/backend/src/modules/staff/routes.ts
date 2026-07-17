@@ -4,6 +4,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 
 import { config } from "../../../../../packages/common/src/utils/config";
+import { isStaffAdminEnabled } from "../../helpers/staffAdmin";
 import { createS3Client } from "../../utils/s3Client";
 
 // Configure multer to handle file uploads in memory
@@ -26,16 +27,7 @@ const upload = multer({
  * POST /api/uploadStaffImage
  *
  * Uploads an image file to the S3 bucket configured for staff photos.
- *
- * Request:
- * - Content-Type: multipart/form-data
- * - Body: FormData with 'image' field containing the image file
- *
- * Response:
- * {
- *   "success": true,
- *   "url": "path/to/uploaded/image.jpg"
- * }
+ * Disabled unless STAFF_ADMIN_ENABLED=true; requires an authenticated staff session.
  */
 export default (app: Application): void => {
   app.post(
@@ -43,6 +35,24 @@ export default (app: Application): void => {
     upload.single("image"),
     async (req: Request, res: Response): Promise<void> => {
       try {
+        if (!isStaffAdminEnabled()) {
+          res.status(403).json({ error: "Staff admin features are disabled" });
+          return;
+        }
+
+        if (!req.isAuthenticated?.() || !req.user) {
+          res.status(401).json({ error: "Authentication required" });
+          return;
+        }
+
+        const user = req.user as { staff?: boolean };
+        if (!user.staff) {
+          res
+            .status(403)
+            .json({ error: "Only staff members can upload images" });
+          return;
+        }
+
         if (!req.file) {
           res.status(400).json({
             error:
@@ -68,16 +78,14 @@ export default (app: Application): void => {
 
         await s3Client.send(putCommand);
 
-        // Return the file path/name (adjust this based on how you want to construct the URL)
         res.status(200).json({
           success: true,
           fileName,
-          url: `${config.s3.imagesAccessUrl}/${fileName}`, // You may want to construct a full URL here if needed
+          url: `${config.s3.imagesAccessUrl}/${fileName}`,
         });
       } catch (error: unknown) {
         console.error("[Staff Upload API] Error:", error);
 
-        // Handle multer errors
         if (
           error instanceof Error &&
           error.message === "Only image files are allowed"
@@ -88,7 +96,6 @@ export default (app: Application): void => {
           return;
         }
 
-        // Handle file size errors
         if (
           error &&
           typeof error === "object" &&

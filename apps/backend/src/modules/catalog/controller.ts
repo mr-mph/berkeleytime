@@ -133,6 +133,37 @@ export const getCatalogSearch = async (params: CatalogQueryParams) => {
   // Build filter query
   const query = buildFilterQuery(year, semester, filters);
 
+  // A/A+ sort treats missing grade data as 25% so undata'd classes aren't
+  // pushed to the extreme ends of the ranking.
+  if (sortBy === "A_PLUS_A_PERCENT") {
+    const order = sortOrder === "ASC" ? 1 : -1;
+    const [totalCount, results] = await Promise.all([
+      CatalogClassModel.countDocuments(query),
+      CatalogClassModel.aggregate([
+        { $match: query },
+        {
+          $addFields: {
+            _sortAPlusAPercent: {
+              $ifNull: ["$allTimeAPlusAPercentage", 0.25],
+            },
+          },
+        },
+        {
+          $sort: {
+            _sortAPlusAPercent: order,
+            subject: 1,
+            courseNumber: 1,
+          },
+        },
+        { $skip: skip },
+        { $limit: effectivePageSize },
+        { $project: { _sortAPlusAPercent: 0 } },
+      ]),
+    ]);
+
+    return { results, totalCount };
+  }
+
   // Build sort
   const sort = buildSort(sortBy, sortOrder);
 
