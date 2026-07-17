@@ -6,6 +6,7 @@ import { Box, Container, PillSwitcher } from "@repo/theme";
 
 import { getEnrollmentColor } from "@/components/Capacity";
 import EmptyState from "@/components/Class/EmptyState";
+import EnrollmentDisplay from "@/components/EnrollmentDisplay";
 import { LocationHoverCard } from "@/components/Location/LocationHoverCard";
 import Time from "@/components/Time";
 import { useGetClassSections } from "@/hooks/api/classes/useGetClass";
@@ -62,7 +63,10 @@ export default function Sections() {
     _class.sessionId,
     _class.subject,
     _class.courseNumber,
-    _class.number
+    _class.number,
+    {
+      fetchPolicy: "network-only",
+    }
   );
 
   const sections = data?.sections ?? [];
@@ -208,6 +212,10 @@ export default function Sections() {
                   const maxEnroll = section.enrollment?.latest?.maxEnroll;
                   const waitlistedCount =
                     section.enrollment?.latest?.waitlistedCount;
+                  const maxWaitlist =
+                    section.enrollment?.latest?.maxWaitlist;
+                  const enrollmentTime =
+                    section.enrollment?.latest?.endTime;
                   const firstMeeting = section.meetings[0];
                   const hasTimeData = Boolean(
                     firstMeeting?.days?.some((day) => day) &&
@@ -291,14 +299,17 @@ export default function Sections() {
                             : undefined
                         }
                       >
-                        {enrollmentPercentage !== null
-                          ? `${enrollmentPercentage}%${
-                              typeof waitlistedCount === "number" &&
-                              waitlistedCount > 0
-                                ? ` (${waitlistedCount} wl.)`
-                                : ""
-                            }`
-                          : NO_DATA_LABEL}
+                        {enrollmentPercentage !== null ? (
+                          <EnrollmentDisplay
+                            enrolledCount={enrolledCount}
+                            maxEnroll={maxEnroll}
+                            waitlistedCount={waitlistedCount}
+                            maxWaitlist={maxWaitlist}
+                            time={enrollmentTime}
+                          />
+                        ) : (
+                          NO_DATA_LABEL
+                        )}
                       </td>
                     </tr>
                   );

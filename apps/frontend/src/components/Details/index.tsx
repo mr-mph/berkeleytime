@@ -1,5 +1,8 @@
+import { OpenNewWindow } from "iconoir-react";
+
 import { Breakpoint, Flex, useBreakpointMatch } from "@repo/theme";
 
+import { AverageRating } from "@/components/AverageRating";
 import { IInstructor } from "@/lib/api";
 
 import Location from "../Location";
@@ -59,20 +62,55 @@ export default function Details({
             ? "Instructors"
             : "Instructor"}
         </p>
-        <p
-          className={styles.description}
-          style={{
-            WebkitLineClamp: 2,
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical",
-          }}
-        >
-          {instructors && instructors.length > 0
-            ? instructors
-                .map((i) => `${i.givenName} ${i.familyName}`)
-                .join(", ")
-            : "To be determined"}
-        </p>
+        {instructors && instructors.length > 0 ? (
+          <div className={styles.instructorList}>
+            {instructors.map((instructor, index) => {
+              const name = [instructor.givenName, instructor.familyName]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+              const rmpUrl = instructor.rmpUrl ?? null;
+              return (
+                <div
+                  key={`${name}-${index}`}
+                  className={styles.instructorRow}
+                >
+                  <div className={styles.instructorName}>
+                    <p className={styles.description}>{name || "Unknown"}</p>
+                    {rmpUrl && (
+                      <a
+                        className={styles.rmpLink}
+                        href={rmpUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${name || "instructor"} on Rate My Professor`}
+                        title="Rate My Professor"
+                      >
+                        <OpenNewWindow />
+                      </a>
+                    )}
+                  </div>
+                  <AverageRating
+                    rating={instructor.rmpRating}
+                    showNA
+                    style={{ fontSize: 14, flexShrink: 0 }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p
+            className={styles.description}
+            style={{
+              WebkitLineClamp: 2,
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+            }}
+          >
+            To be determined
+          </p>
+        )}
       </Flex>
     </Flex>
   );

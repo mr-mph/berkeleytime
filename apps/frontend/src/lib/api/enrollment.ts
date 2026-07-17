@@ -85,3 +85,41 @@ export const READ_ENROLLMENT_TIMEFRAMES = gql`
     }
   }
 `;
+
+export const REFRESH_CLASS_ENROLLMENT = gql`
+  mutation RefreshClassEnrollment(
+    $year: Int!
+    $semester: Semester!
+    $sessionId: SessionIdentifier
+    $subject: String!
+    $courseNumber: CourseNumber!
+    $number: ClassNumber!
+  ) {
+    refreshClassEnrollment(
+      year: $year
+      semester: $semester
+      sessionId: $sessionId
+      subject: $subject
+      courseNumber: $courseNumber
+      number: $number
+    ) {
+      year
+      semester
+      sessionId
+      sectionId
+      subject
+      courseNumber
+      sectionNumber
+      latest {
+        startTime
+        endTime
+        enrolledCount
+        waitlistedCount
+        maxEnroll
+        maxWaitlist
+        activeReservedMaxCount
+        status
+      }
+    }
+  }
+`;

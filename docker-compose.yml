@@ -31,6 +31,27 @@ services:
       - ./.env:/backend/apps/backend/.env
       - ./apps/backend:/backend/apps/backend
       - ./packages:/backend/packages
+  # Live datapullers for local/dev (scheduled loops; skips last-five-years jobs)
+  datapuller:
+    build:
+      context: .
+      dockerfile: ./apps/datapuller/Dockerfile
+      target: datapuller-dev
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - bt
+    restart: always
+    environment:
+      - BACKEND_URL=http://backend:5001
+    volumes:
+      - ./.env:/datapuller/apps/datapuller/.env
+      - ./apps/datapuller:/datapuller/apps/datapuller
+      - ./packages:/datapuller/packages
+    entrypoint: ["/bin/sh", "./apps/datapuller/scripts/dev-scheduler.sh"]
   semantic-search:
     profiles:
       - semantic-search

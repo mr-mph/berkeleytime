@@ -2,6 +2,8 @@ import type { Request } from "express";
 import { GraphQLError, GraphQLScalarType, Kind } from "graphql";
 import type { RedisClientType } from "redis";
 
+import { CatalogClassModel } from "@repo/common/models";
+
 import {
   MutationTrackClassViewArgs,
   SectionSectionAttributesArgs,
@@ -27,6 +29,10 @@ import {
   filterAndSortInstructors,
 } from "./formatter";
 import { ClassModule } from "./generated-types/module-types";
+import {
+  lookupInstructorRmpRating,
+  lookupInstructorRmpUrl,
+} from "./rmpLookup";
 
 interface GraphQLContext {
   req: Request;
@@ -291,6 +297,57 @@ const resolvers: ClassModule.Resolvers = {
         parent.number,
         context.redis
       );
+    },
+
+    rmpAverageRating: async (parent: IntermediateClass | ClassModule.Class) => {
+      const catalogClass = await CatalogClassModel.findOne({
+        year: parent.year,
+        semester: parent.semester,
+        subject: parent.subject,
+        courseNumber: parent.courseNumber,
+        number: parent.number,
+      })
+        .select({ rmpAverageRating: 1 })
+        .lean();
+
+      return catalogClass?.rmpAverageRating ?? null;
+    },
+
+    rmpMatchedInstructorCount: async (
+      parent: IntermediateClass | ClassModule.Class
+    ) => {
+      const catalogClass = await CatalogClassModel.findOne({
+        year: parent.year,
+        semester: parent.semester,
+        subject: parent.subject,
+        courseNumber: parent.courseNumber,
+        number: parent.number,
+      })
+        .select({ rmpMatchedInstructorCount: 1 })
+        .lean();
+
+      return catalogClass?.rmpMatchedInstructorCount ?? 0;
+    },
+  },
+
+  Instructor: {
+    rmpRating: async (parent: {
+      givenName?: string | null;
+      familyName?: string | null;
+      rmpRating?: number | null;
+    }) => {
+      if (typeof parent.rmpRating === "number") return parent.rmpRating;
+      return lookupInstructorRmpRating(parent.givenName, parent.familyName);
+    },
+    rmpUrl: async (parent: {
+      givenName?: string | null;
+      familyName?: string | null;
+      rmpUrl?: string | null;
+    }) => {
+      if (typeof parent.rmpUrl === "string" && parent.rmpUrl.length > 0) {
+        return parent.rmpUrl;
+      }
+      return lookupInstructorRmpUrl(parent.givenName, parent.familyName);
     },
   },
 

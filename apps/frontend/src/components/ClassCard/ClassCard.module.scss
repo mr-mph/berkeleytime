@@ -49,6 +49,13 @@
   row-gap: 8px;
 }
 
+.ratingEnd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .reservedSeating {
   font-size: var(--text-14);
   color: var(--paragraph-color);

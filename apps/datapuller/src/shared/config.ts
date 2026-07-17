@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import dotenv from "dotenv";
 import { Logger } from "tslog";
 
@@ -35,8 +39,31 @@ export interface Config {
   SEMANTIC_SEARCH_URL: string;
 }
 
+const loadEnvFiles = () => {
+  const sharedDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    // Repo root when running from source: apps/datapuller/src/shared -> ../../../../.env
+    path.resolve(sharedDir, "../../../../.env"),
+    // CWD is apps/datapuller (npm workspace / docker mount at apps/datapuller/.env)
+    path.resolve(process.cwd(), ".env"),
+    // CWD is apps/datapuller but env lives at repo root
+    path.resolve(process.cwd(), "../../.env"),
+  ];
+
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    if (!fs.existsSync(candidate)) continue;
+    dotenv.config({ path: candidate, override: false });
+  }
+
+  // Default cwd lookup as a last resort
+  dotenv.config({ override: false });
+};
+
 export function loadConfig(): Config {
-  dotenv.config();
+  loadEnvFiles();
 
   const log = new Logger({
     type: "pretty",

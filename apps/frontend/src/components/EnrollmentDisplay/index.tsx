@@ -62,8 +62,12 @@ export default function EnrollmentDisplay({
               the waitlist.
             </>
           )}
-          <br />
-          <i>Updated {formattedTime}.</i>
+          {formattedTime && (
+            <>
+              <br />
+              <i>Updated {formattedTime}.</i>
+            </>
+          )}
         </>
       }
     />

@@ -62,6 +62,8 @@ export const classTypeDef = gql`
     requirementDesignation: SectionAttributeInfo
     anyPrintInScheduleOfClasses: Boolean
     viewCount: Int!
+    rmpAverageRating: Float
+    rmpMatchedInstructorCount: Int
   }
 
   enum ClassFinalExam {
@@ -261,6 +263,8 @@ export const classTypeDef = gql`
   type Instructor {
     familyName: String
     givenName: String
+    rmpRating: Float
+    rmpUrl: String
   }
 
   type SectionAttribute {

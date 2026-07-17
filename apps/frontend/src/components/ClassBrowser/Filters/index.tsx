@@ -4,6 +4,10 @@ import { Filter, SortDown, SortUp } from "iconoir-react";
 import { useNavigate } from "react-router-dom";
 
 import {
+  EECS_REQUIREMENT_OPTIONS,
+  type EecsRequirementValue,
+} from "@repo/shared";
+import {
   Button,
   DaySelect,
   IconButton,
@@ -30,11 +34,13 @@ import ScheduleConflictFilter from "./ScheduleConflictFilter";
 
 type RequirementSelection =
   | { type: "breadth"; value: string }
-  | { type: "university"; value: string };
+  | { type: "university"; value: string }
+  | { type: "eecs"; value: EecsRequirementValue };
 
 const REQUIREMENT_TABS = {
   LS: "ls",
   UNIVERSITY: "university",
+  EECS: "eecs",
 } as const;
 
 export default function Filters() {
@@ -52,6 +58,8 @@ export default function Filters() {
     updateBreadths,
     universityRequirements,
     updateUniversityRequirements,
+    eecsRequirement,
+    updateEecsRequirement,
     gradingFilters,
     updateGradingFilters,
     enrollmentFilter,
@@ -90,6 +98,7 @@ export default function Filters() {
       "Upper Division": 0,
       Graduate: 0,
       Extension: 0,
+      DeCal: 1, // always available when catalog has DeCal classes
     };
     if (filterOptions) {
       for (const level of filterOptions.levels) {
@@ -122,6 +131,15 @@ export default function Filters() {
     [filterOptions]
   );
 
+  const eecsRequirementOptions = useMemo<Option<RequirementSelection>[]>(
+    () =>
+      EECS_REQUIREMENT_OPTIONS.map((option) => ({
+        value: { type: "eecs", value: option.value } as RequirementSelection,
+        label: option.label,
+      })),
+    []
+  );
+
   const requirementTabs = useMemo<SelectTab<RequirementSelection>[]>(() => {
     const tabs: SelectTab<RequirementSelection>[] = [];
 
@@ -141,12 +159,25 @@ export default function Filters() {
       });
     }
 
+    tabs.push({
+      value: REQUIREMENT_TABS.EECS,
+      label: "EECS",
+      options: eecsRequirementOptions,
+    });
+
     return tabs;
-  }, [breadthRequirementOptions, universityRequirementOptions]);
+  }, [
+    breadthRequirementOptions,
+    universityRequirementOptions,
+    eecsRequirementOptions,
+  ]);
   const requirementSelectTabs =
     requirementTabs.length > 0 ? requirementTabs : undefined;
 
   const selectedRequirement = useMemo<RequirementSelection | null>(() => {
+    if (eecsRequirement) {
+      return { type: "eecs", value: eecsRequirement };
+    }
     if (breadths.length > 0) {
       return { type: "breadth", value: breadths[0] };
     }
@@ -154,9 +185,13 @@ export default function Filters() {
       return { type: "university", value: universityRequirements[0] };
     }
     return null;
-  }, [breadths, universityRequirements]);
+  }, [breadths, universityRequirements, eecsRequirement]);
 
   useEffect(() => {
+    if (selectedRequirement?.type === "eecs") {
+      setActiveRequirementTab(REQUIREMENT_TABS.EECS);
+      return;
+    }
     if (selectedRequirement?.type === "breadth") {
       setActiveRequirementTab(REQUIREMENT_TABS.LS);
       return;
@@ -207,10 +242,15 @@ export default function Filters() {
 
   const currentTermLabel = `${semester} ${year}`;
 
-  const handleClearFilters = () => {
-    updateLevels([]);
+  const clearRequirementFilters = () => {
     updateBreadths([]);
     updateUniversityRequirements([]);
+    updateEecsRequirement(null);
+  };
+
+  const handleClearFilters = () => {
+    updateLevels([]);
+    clearRequirementFilters();
     updateGradingFilters([]);
     updateUnits([0, 5]);
     setDaysArray([...EMPTY_DAYS]);
@@ -326,18 +366,25 @@ export default function Filters() {
             }}
             onChange={(value) => {
               if (value === null) {
-                updateBreadths([]);
-                updateUniversityRequirements([]);
+                clearRequirementFilters();
                 return;
               }
               if (Array.isArray(value)) return;
               if (value.type === "breadth") {
                 updateBreadths([value.value]);
                 updateUniversityRequirements([]);
+                updateEecsRequirement(null);
                 return;
               }
-              updateUniversityRequirements([value.value]);
+              if (value.type === "university") {
+                updateUniversityRequirements([value.value]);
+                updateBreadths([]);
+                updateEecsRequirement(null);
+                return;
+              }
+              updateEecsRequirement(value.value);
               updateBreadths([]);
+              updateUniversityRequirements([]);
             }}
             searchPlaceholder="Search requirements..."
             emptyMessage="No requirements found."

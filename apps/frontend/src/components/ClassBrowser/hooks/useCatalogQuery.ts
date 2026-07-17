@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useQuery } from "@apollo/client/react";
+import { useApolloClient, useQuery } from "@apollo/client/react";
 
 import type {
   ICatalogClassServer,
@@ -8,6 +8,7 @@ import type {
   ICatalogFilters,
 } from "@/lib/api/catalog";
 import { GET_CATALOG_SEARCH } from "@/lib/api/catalog";
+import { CATALOG_ENROLLMENT_REFRESH_EVENT } from "@/lib/catalogEnrollmentRefresh";
 import { GetCatalogFilterOptionsDocument } from "@/lib/generated/graphql";
 import type {
   GetCatalogSearchQuery,
@@ -48,6 +49,15 @@ const mergeUniqueCatalogClasses = (
   return [...existingClasses, ...uniqueIncomingClasses];
 };
 
+const enrollmentFieldsEqual = (
+  a: ICatalogClassServer,
+  b: ICatalogClassServer
+) =>
+  a.enrolledCount === b.enrolledCount &&
+  a.maxEnroll === b.maxEnroll &&
+  a.activeReservedMaxCount === b.activeReservedMaxCount &&
+  a.enrollmentUpdatedAt === b.enrollmentUpdatedAt;
+
 export interface UseCatalogQueryOptions {
   year: number;
   semester: Semester;
@@ -80,11 +90,14 @@ export default function useCatalogQuery({
   filterVariables,
   semanticSearch = false,
 }: UseCatalogQueryOptions): UseCatalogQueryReturn {
+  const apolloClient = useApolloClient();
   const [localPage, setLocalPage] = useState(1);
   const [classes, setClasses] = useState<ICatalogClassServer[]>([]);
   const [isLoadingNextPage, setIsLoadingNextPage] = useState(false);
   const isLoadingNextPageRef = useRef(false);
   const queryGenerationRef = useRef(0);
+  const localPageRef = useRef(1);
+  const isRefreshingEnrollmentRef = useRef(false);
 
   // In semantic mode the query is committed externally — no debounce needed.
   // In normal mode, debounce to avoid firing on every keystroke.
@@ -137,8 +150,15 @@ export default function useCatalogQuery({
     ]
   );
 
+  const catalogQueryVariablesRef = useRef(catalogQueryVariables);
+  catalogQueryVariablesRef.current = catalogQueryVariables;
+  localPageRef.current = localPage;
+
   // Server-side catalog query (always requests first page)
-  const { data, loading, error, fetchMore } = useQuery<GetCatalogSearchQuery, GetCatalogSearchQueryVariables>(GET_CATALOG_SEARCH, {
+  const { data, loading, error, fetchMore } = useQuery<
+    GetCatalogSearchQuery,
+    GetCatalogSearchQueryVariables
+  >(GET_CATALOG_SEARCH, {
     variables: {
       ...catalogQueryVariables,
       page: 1,
@@ -168,12 +188,81 @@ export default function useCatalogQuery({
   const totalCount: number = data?.catalogSearch?.totalCount ?? 0;
 
   useEffect(() => {
-    if (localPage !== 1) return;
+    if (localPage === 1) {
+      setClasses(firstPageClasses);
+      setIsLoadingNextPage(false);
+      isLoadingNextPageRef.current = false;
+      return;
+    }
 
-    setClasses(firstPageClasses);
-    setIsLoadingNextPage(false);
-    isLoadingNextPageRef.current = false;
+    // After scroll-load, still merge refreshed page-1 enrollment into the list.
+    if (firstPageClasses.length === 0) return;
+    setClasses((previousClasses) => {
+      const updates = new Map(
+        firstPageClasses.map((catalogClass) => [
+          getCatalogClassKey(catalogClass),
+          catalogClass,
+        ])
+      );
+      let changed = false;
+      const next = previousClasses.map((catalogClass) => {
+        const updated = updates.get(getCatalogClassKey(catalogClass));
+        if (!updated || enrollmentFieldsEqual(catalogClass, updated)) {
+          return catalogClass;
+        }
+        changed = true;
+        return { ...catalogClass, ...updated };
+      });
+      return changed ? next : previousClasses;
+    });
   }, [firstPageClasses, localPage]);
+
+  const refreshLoadedEnrollment = useCallback(async () => {
+    if (isRefreshingEnrollmentRef.current) return;
+    isRefreshingEnrollmentRef.current = true;
+    const requestGeneration = queryGenerationRef.current;
+    const pagesToLoad = Math.max(localPageRef.current, 1);
+    const variables = catalogQueryVariablesRef.current;
+
+    try {
+      const pageResults: ICatalogClassServer[][] = [];
+      for (let page = 1; page <= pagesToLoad; page += 1) {
+        const { data: pageData } = await apolloClient.query<
+          GetCatalogSearchQuery,
+          GetCatalogSearchQueryVariables
+        >({
+          query: GET_CATALOG_SEARCH,
+          variables: {
+            ...variables,
+            page,
+            pageSize: DEFAULT_PAGE_SIZE,
+          },
+          fetchPolicy: "network-only",
+        });
+        pageResults.push(pageData?.catalogSearch?.results ?? []);
+      }
+
+      if (requestGeneration !== queryGenerationRef.current) return;
+
+      const merged = pageResults.reduce<ICatalogClassServer[]>(
+        (acc, pageClasses) => mergeUniqueCatalogClasses(acc, pageClasses),
+        []
+      );
+      setClasses(merged);
+    } finally {
+      isRefreshingEnrollmentRef.current = false;
+    }
+  }, [apolloClient]);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      void refreshLoadedEnrollment();
+    };
+    window.addEventListener(CATALOG_ENROLLMENT_REFRESH_EVENT, onRefresh);
+    return () => {
+      window.removeEventListener(CATALOG_ENROLLMENT_REFRESH_EVENT, onRefresh);
+    };
+  }, [refreshLoadedEnrollment]);
 
   const hasNextPage = classes.length < totalCount;
 

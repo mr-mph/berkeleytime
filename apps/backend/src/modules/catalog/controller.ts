@@ -23,6 +23,7 @@ import {
   SectionModel,
   TermModel,
 } from "@repo/common/models";
+import { isLsBreadthRequirement } from "@repo/shared";
 
 import { getFields, hasFieldPath } from "../../utils/graphql";
 import { searchSemantic } from "../semantic-search/client";
@@ -50,6 +51,9 @@ export interface CatalogQueryParams {
     gradingFilters?: string[] | null;
     breadths?: string[] | null;
     universityRequirements?: string[] | null;
+    courseIdentifiers?:
+      | { subject: string; courseNumber: string }[]
+      | null;
     online?: boolean | null;
   } | null;
   sortBy?: string | null;
@@ -229,13 +233,16 @@ const applyInMemoryFilters = (
   if (!filters) return items;
 
   return items.filter((item) => {
-    // Level filter
-    if (
-      filters.levels &&
-      filters.levels.length > 0 &&
-      !filters.levels.includes(item.level ?? "")
-    ) {
-      return false;
+    // Level filter (DeCal matches classes with decal data)
+    if (filters.levels && filters.levels.length > 0) {
+      const wantsDecal = filters.levels.includes("DeCal");
+      const otherLevels = filters.levels.filter((level) => level !== "DeCal");
+      const matchesLevel =
+        otherLevels.length > 0 && otherLevels.includes(item.level ?? "");
+      const matchesDecal = wantsDecal && item.decal != null;
+      if (!matchesLevel && !matchesDecal) {
+        return false;
+      }
     }
 
     // Department filter
@@ -345,6 +352,19 @@ const applyInMemoryFilters = (
       return false;
     }
 
+    // Specific course identifiers (e.g. EECS Ethics list)
+    if (
+      filters.courseIdentifiers &&
+      filters.courseIdentifiers.length > 0 &&
+      !filters.courseIdentifiers.some(
+        (identifier) =>
+          identifier.subject === item.subject &&
+          identifier.courseNumber === item.courseNumber
+      )
+    ) {
+      return false;
+    }
+
     // Online filter
     if (filters.online && item.primaryOnline !== true) {
       return false;
@@ -363,9 +383,20 @@ const buildFilterQuery = (
 
   if (!filters) return query;
 
-  // Level filter
+  // Level filter (DeCal matches classes with decal data)
   if (filters.levels && filters.levels.length > 0) {
-    query.level = { $in: filters.levels };
+    const wantsDecal = filters.levels.includes("DeCal");
+    const otherLevels = filters.levels.filter((level) => level !== "DeCal");
+
+    if (wantsDecal && otherLevels.length === 0) {
+      query.decal = { $ne: null };
+    } else if (wantsDecal && otherLevels.length > 0) {
+      appendAndCondition(query, {
+        $or: [{ level: { $in: otherLevels } }, { decal: { $ne: null } }],
+      });
+    } else {
+      query.level = { $in: otherLevels };
+    }
   }
 
   // Department filter
@@ -477,6 +508,16 @@ const buildFilterQuery = (
     query.universityRequirements = { $in: filters.universityRequirements };
   }
 
+  // Specific course identifiers (e.g. EECS Ethics list)
+  if (filters.courseIdentifiers && filters.courseIdentifiers.length > 0) {
+    appendAndCondition(query, {
+      $or: filters.courseIdentifiers.map(({ subject, courseNumber }) => ({
+        subject,
+        courseNumber,
+      })),
+    });
+  }
+
   // Online filter
   if (filters.online) {
     query.primaryOnline = true;
@@ -498,6 +539,14 @@ const buildSort = (
       return { allTimeAverageGrade: order, subject: 1, courseNumber: 1 };
     case "OPEN_SEATS":
       return { openSeats: order, subject: 1, courseNumber: 1 };
+    case "BERKELEYTIME_AVERAGE_RATING":
+      return { berkeleytimeAverageRating: order, subject: 1, courseNumber: 1 };
+    case "BERKELEYTIME_RATING_COUNT":
+      return { berkeleytimeRatingCount: order, subject: 1, courseNumber: 1 };
+    case "A_PLUS_A_PERCENT":
+      return { allTimeAPlusAPercentage: order, subject: 1, courseNumber: 1 };
+    case "RMP_AVERAGE_RATING":
+      return { rmpAverageRating: order, subject: 1, courseNumber: 1 };
     case "RELEVANCE":
     default:
       return { viewCount: order, subject: 1, courseNumber: 1 };
@@ -547,7 +596,9 @@ export const getCatalogFilterOptions = async (
   const result = filterAgg[0];
 
   const breadths = result
-    ? (result.breadthRequirements as string[]).filter(Boolean).sort()
+    ? (result.breadthRequirements as string[])
+        .filter((breadth) => isLsBreadthRequirement(breadth))
+        .sort()
     : [];
   const uniReqs = result
     ? (result.universityRequirements as string[]).filter(Boolean).sort()

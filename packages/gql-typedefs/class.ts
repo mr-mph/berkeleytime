@@ -78,6 +78,10 @@ export const classTypeDef = gql`
     anyPrintInScheduleOfClasses: Boolean
     viewCount: Int!
     decal: DeCal
+    rmpAverageRating: Float
+
+    "Number of instructors with a real RMP rating"
+    rmpMatchedInstructorCount: Int
   }
 
   enum ClassFinalExam {
@@ -277,6 +281,10 @@ export const classTypeDef = gql`
   type Instructor {
     familyName: String
     givenName: String
+    "Rate My Professor average (1–5), null when N/A or unmatched"
+    rmpRating: Float
+    "Public Rate My Professor profile URL when matched"
+    rmpUrl: String
   }
 
   type SectionAttribute {

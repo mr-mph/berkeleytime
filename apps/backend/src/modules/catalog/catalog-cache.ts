@@ -31,6 +31,21 @@ const evictOldest = () => {
   }
 };
 
+export const invalidateCatalogCache = (
+  year?: number,
+  semester?: string
+): void => {
+  if (year != null && semester != null) {
+    const key = `${year}:${semester}`;
+    catalogCache.delete(key);
+    indexCache.delete(key);
+    return;
+  }
+
+  catalogCache.clear();
+  indexCache.clear();
+};
+
 export const getCachedCatalog = async (
   year: number,
   semester: string

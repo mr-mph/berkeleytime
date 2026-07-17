@@ -6,6 +6,10 @@ export const catalogTypeDef = gql`
     UNITS
     AVERAGE_GRADE
     OPEN_SEATS
+    BERKELEYTIME_AVERAGE_RATING
+    BERKELEYTIME_RATING_COUNT
+    A_PLUS_A_PERCENT
+    RMP_AVERAGE_RATING
   }
 
   enum SortOrder {
@@ -17,6 +21,11 @@ export const catalogTypeDef = gql`
     OPEN
     NON_RESERVED_OPEN
     WAITLIST_OPEN
+  }
+
+  input CatalogCourseIdentifierInput {
+    subject: String!
+    courseNumber: String!
   }
 
   input CatalogFilters {
@@ -31,6 +40,7 @@ export const catalogTypeDef = gql`
     gradingFilters: [String!]
     breadths: [String!]
     universityRequirements: [String!]
+    courseIdentifiers: [CatalogCourseIdentifierInput!]
     online: Boolean
   }
 
@@ -145,6 +155,8 @@ export const catalogTypeDef = gql`
     waitlistedCount: Int
     maxWaitlist: Int
     activeReservedMaxCount: Int
+    "When primary enrollment was last scraped/updated"
+    enrollmentUpdatedAt: ISODate
 
     "DeCal"
     decal: CatalogDeCal
@@ -154,6 +166,9 @@ export const catalogTypeDef = gql`
 
     "Pre-computed sort"
     openSeats: Int
+    rmpAverageRating: Float
+    "Number of instructors with a real RMP rating (N/A instructors excluded)"
+    rmpMatchedInstructorCount: Int
 
     "Stats"
     viewCount: Int

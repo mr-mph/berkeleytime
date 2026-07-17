@@ -13,6 +13,7 @@ import { METRIC_ORDER } from "@repo/shared";
 import { Badge, Card, Color as ThemeColor, Tooltip } from "@repo/theme";
 
 import { AverageGrade } from "@/components/AverageGrade";
+import { AverageRating } from "@/components/AverageRating";
 import {
   getMetricStatus,
   getStatusColor,
@@ -78,6 +79,8 @@ type ClassCardClass = Partial<BaseClassFields> & {
   semester?: Semester;
   course?: Partial<CourseSummary> | null;
   decal?: { title?: string | null } | null;
+  rmpAverageRating?: number | null;
+  rmpMatchedInstructorCount?: number | null;
   primarySection?: {
     enrollment?: {
       latest?: Partial<EnrollmentSnapshot> | null;
@@ -342,6 +345,21 @@ export default function ClassCard({
                 </>
               )}
               {infoContent}
+              <div className={styles.ratingEnd}>
+                <AverageRating
+                  rating={
+                    _class?.rmpMatchedInstructorCount === 0
+                      ? null
+                      : _class?.rmpAverageRating
+                  }
+                  showNA
+                  style={{
+                    fontSize: 14,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                />
+              </div>
               {expandable && onExpandedChange !== undefined && (
                 <Card.ActionIcon
                   data-action-icon

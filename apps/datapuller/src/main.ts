@@ -8,8 +8,10 @@ import enrollmentHistoriesPuller from "./pullers/enrollment";
 import enrollmentTimeframePuller from "./pullers/enrollment-timeframe";
 import gradeDistributionsPuller from "./pullers/grade-distributions";
 import migrationsPuller from "./pullers/migrations";
+import rateMyProfessorsPuller from "./pullers/ratemyprofessors";
 import sectionsPuller from "./pullers/sections";
 import termsPuller from "./pullers/terms";
+import ucbCatalogEnrollmentsPuller from "./pullers/ucb-catalog-enrollments";
 import setup from "./shared";
 import { Config } from "./shared/config";
 
@@ -38,6 +40,9 @@ const pullerMap: {
     migrationsPuller.backfillAggregatedMetricsClassId,
   "catalog-sync-grades": async (config: Config) =>
     updateCatalogGradeSummaries(config.log),
+  ratemyprofessors: rateMyProfessorsPuller.syncRateMyProfessors,
+  "ucb-catalog-enrollments":
+    ucbCatalogEnrollmentsPuller.syncUcbCatalogEnrollments,
 } as const;
 
 const runPuller = async () => {

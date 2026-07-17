@@ -1,7 +1,13 @@
+import type { RedisClientType } from "redis";
+
 import { EnrollmentTimeframeModel } from "@repo/common/models";
 
-import { getEnrollment } from "./controller";
+import { getEnrollment, refreshClassEnrollment } from "./controller";
 import { EnrollmentModule } from "./generated-types/module-types";
+
+type EnrollmentContext = {
+  redis: RedisClientType;
+};
 
 const resolvers: EnrollmentModule.Resolvers = {
   Query: {
@@ -34,6 +40,25 @@ const resolvers: EnrollmentModule.Resolvers = {
       }));
     },
   },
+
+  Mutation: {
+    refreshClassEnrollment: async (
+      _,
+      { year, semester, sessionId, subject, courseNumber, number },
+      context: EnrollmentContext
+    ) => {
+      return await refreshClassEnrollment(
+        year,
+        semester,
+        sessionId ?? null,
+        subject,
+        courseNumber,
+        number,
+        context.redis
+      );
+    },
+  },
+
   EnrollmentSingular: {
     activeReservedMaxCount: (parent) => {
       const seatReservations = parent.seatReservationCount ?? [];

@@ -1,6 +1,11 @@
 import { connection } from "mongoose";
 
-import { GradeCounts, getAverageGrade, getDistribution } from "@repo/common";
+import {
+  GradeCounts,
+  getAPlusAPercentage,
+  getAverageGrade,
+  getDistribution,
+} from "@repo/common";
 import { CourseModel, GradeDistributionModel } from "@repo/common/models";
 
 import { updateCatalogGradeSummaries } from "../lib/catalog-denormalize";
@@ -30,6 +35,7 @@ export const rebuildCourseGradeSummaries = async (log: Config["log"]) => {
         { allTimeAverageGrade: { $ne: null } },
         { allTimePassCount: { $ne: null } },
         { allTimeNoPassCount: { $ne: null } },
+        { allTimeAPlusAPercentage: { $ne: null } },
       ],
     },
     {
@@ -37,6 +43,7 @@ export const rebuildCourseGradeSummaries = async (log: Config["log"]) => {
         allTimeAverageGrade: null,
         allTimePassCount: null,
         allTimeNoPassCount: null,
+        allTimeAPlusAPercentage: null,
       },
     }
   );
@@ -77,11 +84,14 @@ export const rebuildCourseGradeSummaries = async (log: Config["log"]) => {
       const gradeCounts = counts as GradeCounts;
       const distribution = getDistribution([gradeCounts]);
       const averageGrade = getAverageGrade(distribution);
+      const aPlusAPercentage = getAPlusAPercentage(gradeCounts);
       const passCount = gradeCounts.countP + gradeCounts.countS;
       const noPassCount = gradeCounts.countNP + gradeCounts.countU;
       const hasPnpData = passCount + noPassCount > 0;
 
-      if (averageGrade === null && !hasPnpData) return null;
+      if (averageGrade === null && !hasPnpData && aPlusAPercentage === null) {
+        return null;
+      }
 
       return {
         updateMany: {
@@ -91,6 +101,7 @@ export const rebuildCourseGradeSummaries = async (log: Config["log"]) => {
               allTimeAverageGrade: averageGrade,
               allTimePassCount: hasPnpData ? passCount : null,
               allTimeNoPassCount: hasPnpData ? noPassCount : null,
+              allTimeAPlusAPercentage: aPlusAPercentage,
             },
           },
         },

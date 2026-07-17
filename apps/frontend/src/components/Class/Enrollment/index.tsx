@@ -95,7 +95,10 @@ export default function Enrollment() {
     _class.sessionId,
     _class.subject,
     _class.courseNumber,
-    _class.number
+    _class.number,
+    {
+      fetchPolicy: "network-only",
+    }
   );
 
   const chartRef = useRef<HTMLDivElement>(null);

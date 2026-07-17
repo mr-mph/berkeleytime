@@ -186,7 +186,7 @@ export default function NavigationBar({
         })}
       >
         <Link className={styles.brand} to="/">
-          Berkeleytime
+          EECStime
         </Link>
         <div className={styles.group}>
           <NavLink to="/catalog">

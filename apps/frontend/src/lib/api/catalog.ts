@@ -46,6 +46,9 @@ export const GET_CATALOG_SEARCH = gql`
         enrolledCount
         maxEnroll
         activeReservedMaxCount
+        enrollmentUpdatedAt
+        rmpAverageRating
+        rmpMatchedInstructorCount
         aggregatedRatings {
           metrics {
             metricName

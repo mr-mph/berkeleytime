@@ -21,3 +21,68 @@
     color: var(--blue-hover);
   }
 }
+
+.requirementsGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.requirementGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.requirementGroupLabel {
+  font-weight: var(--font-medium);
+  font-size: var(--text-12);
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--label-color);
+}
+
+.requirementTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.requirementStatusList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.requirementStatusRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-14);
+  line-height: 20px;
+}
+
+.requirementStatusName {
+  color: var(--paragraph-color);
+}
+
+.requirementStatusValue {
+  font-weight: var(--font-medium);
+  color: var(--heading-color);
+  white-space: nowrap;
+}
+
+.requirementStatusValueYes {
+  color: var(--green-500);
+}
+
+.requirementStatusValueNo {
+  color: var(--label-color);
+}
+
+.requirementStatusDetail {
+  color: var(--label-color);
+  font-weight: var(--font-normal);
+}

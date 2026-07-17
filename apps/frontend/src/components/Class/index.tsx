@@ -11,7 +11,7 @@ import {
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { motion } from "framer-motion";
-import { OpenNewWindow } from "iconoir-react";
+import { OpenNewWindow, Refresh } from "iconoir-react";
 import { Tabs } from "radix-ui";
 import { Link, useLocation } from "react-router-dom";
 
@@ -24,6 +24,7 @@ import {
   Container,
   Flex,
   IconButton,
+  LoadingIndicator,
   MenuItem,
   Tooltip as ThemeTooltip,
 } from "@repo/theme";
@@ -47,9 +48,14 @@ import {
   signIn,
 } from "@/lib/api";
 import { getEnrollmentInputSearchParam } from "@/lib/enrollmentUrl";
+import { requestCatalogEnrollmentRefresh } from "@/lib/catalogEnrollmentRefresh";
 import {
   CreateRatingsDocument,
+  GetClassDetailsDocument,
+  GetClassEnrollmentDocument,
+  GetClassSectionsDocument,
   GetUserRatingsDocument,
+  RefreshClassEnrollmentDocument,
   Semester,
 } from "@/lib/generated/graphql";
 import { RecentType, addRecent } from "@/lib/recent";
@@ -215,7 +221,7 @@ export default function Class({
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
 
-  const { data } = useGetClass(
+  const { data, refetch: refetchClass } = useGetClass(
     year as number,
     semester as Semester,
     sessionId as string,
@@ -228,8 +234,85 @@ export default function Class({
     }
   );
 
+  const [refreshClassEnrollment, { loading: refreshingEnrollment }] =
+    useMutation(RefreshClassEnrollmentDocument);
+
   const _class = useMemo(() => providedClass ?? data, [data, providedClass]);
   const primarySection = _class?.primarySection ?? null;
+
+  const handleRefreshEnrollment = useCallback(async () => {
+    if (!_class) return;
+    try {
+      await refreshClassEnrollment({
+        variables: {
+          year: _class.year,
+          semester: _class.semester,
+          sessionId: _class.sessionId,
+          subject: _class.subject,
+          courseNumber: _class.courseNumber,
+          number: _class.number,
+        },
+        refetchQueries: [
+          {
+            query: GetClassDetailsDocument,
+            variables: {
+              year: _class.year,
+              semester: _class.semester,
+              sessionId: _class.sessionId,
+              subject: _class.subject,
+              courseNumber: _class.courseNumber,
+              number: _class.number,
+            },
+          },
+          {
+            query: GetClassEnrollmentDocument,
+            variables: {
+              year: _class.year,
+              semester: _class.semester,
+              sessionId: _class.sessionId,
+              subject: _class.subject,
+              courseNumber: _class.courseNumber,
+              number: _class.number,
+            },
+          },
+          {
+            query: GetClassSectionsDocument,
+            variables: {
+              year: _class.year,
+              semester: _class.semester,
+              sessionId: _class.sessionId,
+              subject: _class.subject,
+              courseNumber: _class.courseNumber,
+              number: _class.number,
+            },
+          },
+          // ClassBrowser cards read denormalized enrollment from catalogSearch
+          "GetCatalogSearch",
+        ],
+        awaitRefetchQueries: true,
+      });
+      requestCatalogEnrollmentRefresh();
+      if (!providedClass) {
+        await refetchClass();
+      }
+    } catch (error) {
+      const apolloMessage =
+        error &&
+        typeof error === "object" &&
+        "graphQLErrors" in error &&
+        Array.isArray((error as { graphQLErrors?: Array<{ message?: string }> }).graphQLErrors)
+          ? (error as { graphQLErrors: Array<{ message?: string }> })
+              .graphQLErrors[0]?.message
+          : undefined;
+      setErrorMessage(
+        apolloMessage ||
+          (error instanceof Error
+            ? error.message
+            : "Failed to refresh enrollment from Berkeley Catalog")
+      );
+      setIsErrorDialogOpen(true);
+    }
+  }, [_class, providedClass, refreshClassEnrollment, refetchClass]);
   const classIdentity = useMemo(() => {
     if (!_class) return null;
     return [
@@ -539,24 +622,47 @@ export default function Class({
               <Flex direction="column" gap="4">
                 <Flex justify="between" align="start" mt="2">
                   <Flex direction="column" gap="2">
-                    <h1 className={styles.heading}>
-                      {_class.subject} {_class.courseNumber}{" "}
-                      <span className={styles.sectionNumber}>
-                        #{formatClassNumber(_class.number)}
-                      </span>
-                      {_class.decal != null && _class.decal.title != null && (
-                        <Badge
-                          label="DeCal"
-                          color={Color.Blue}
-                          variant="filled"
-                          style={{
-                            marginLeft: 12,
-                            position: "relative",
-                            bottom: 4,
-                          }}
-                        />
-                      )}
-                    </h1>
+                    <Flex align="center" gap="2">
+                      <h1 className={styles.heading}>
+                        {_class.subject} {_class.courseNumber}{" "}
+                        <span className={styles.sectionNumber}>
+                          #{formatClassNumber(_class.number)}
+                        </span>
+                        {_class.decal != null && _class.decal.title != null && (
+                          <Badge
+                            label="DeCal"
+                            color={Color.Blue}
+                            variant="filled"
+                            style={{
+                              marginLeft: 12,
+                              position: "relative",
+                              bottom: 4,
+                            }}
+                          />
+                        )}
+                      </h1>
+                      <ThemeTooltip
+                        content="Refresh enrollment from Berkeley Catalog"
+                        trigger={
+                          <IconButton
+                            type="button"
+                            aria-label="Refresh enrollment from Berkeley Catalog"
+                            disabled={refreshingEnrollment}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void handleRefreshEnrollment();
+                            }}
+                          >
+                            {refreshingEnrollment ? (
+                              <LoadingIndicator />
+                            ) : (
+                              <Refresh />
+                            )}
+                          </IconButton>
+                        }
+                      />
+                    </Flex>
                     <p className={styles.description}>{classTitle}</p>
                   </Flex>
                   <Flex gap="3">

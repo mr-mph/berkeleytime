@@ -8,6 +8,7 @@ import { RedisClientType } from "redis";
 
 import { config } from "../../../../../packages/common/src/utils/config";
 import bannerRoutes from "../../modules/banner/routes";
+import cacheRoutes from "../../modules/cache/routes";
 import routeRedirectRoutes from "../../modules/route-redirect/routes";
 import semanticSearchRoutes from "../../modules/semantic-search/routes";
 import staffRoutes from "../../modules/staff/routes";
@@ -81,6 +82,9 @@ export default async (
 
   // load semantic search routes
   app.use("/semantic-search", semanticSearchRoutes);
+
+  // cache / datapuller helper routes (under BACKEND_PATH, e.g. /api/cache/...)
+  cacheRoutes(app, redis);
 
   // load staff routes
   staffRoutes(app);

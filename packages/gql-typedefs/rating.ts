@@ -40,6 +40,10 @@ export const ratingTypeDef = gql`
   type Instructor {
     givenName: String!
     familyName: String!
+    "Rate My Professor average (1–5), null when N/A or unmatched"
+    rmpRating: Float
+    "Public Rate My Professor profile URL when matched"
+    rmpUrl: String
   }
 
   """

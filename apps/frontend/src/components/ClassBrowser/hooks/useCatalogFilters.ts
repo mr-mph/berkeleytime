@@ -9,6 +9,14 @@ import {
 
 import { useSearchParams } from "react-router-dom";
 
+import {
+  EECS_ETHICS_COURSES,
+  EECS_HUMANITIES_SOCIAL_SCIENCES_BREADTHS,
+  EECS_REQUIREMENT_VALUES,
+  type EecsRequirementValue,
+  isEecsRequirementValue,
+} from "@repo/shared";
+
 import type { ICatalogFilters } from "@/lib/api/catalog";
 import type { GetCatalogSearchQueryVariables } from "@/lib/generated/graphql";
 
@@ -30,6 +38,10 @@ const DEFAULT_SORT_ORDER: Record<SortBy, "asc" | "desc"> = {
   [SortBy.Units]: "asc",
   [SortBy.AverageGrade]: "desc",
   [SortBy.OpenSeats]: "desc",
+  [SortBy.BerkeleytimeAverageRating]: "desc",
+  [SortBy.BerkeleytimeRatingCount]: "desc",
+  [SortBy.APlusAPercent]: "desc",
+  [SortBy.RmpAverageRating]: "desc",
 };
 
 const getEffectiveOrder = (
@@ -93,6 +105,14 @@ export const mapSortBy = (sortBy: SortBy): CatalogSortBy => {
       return "AVERAGE_GRADE" as CatalogSortBy;
     case SortBy.OpenSeats:
       return "OPEN_SEATS" as CatalogSortBy;
+    case SortBy.BerkeleytimeAverageRating:
+      return "BERKELEYTIME_AVERAGE_RATING" as CatalogSortBy;
+    case SortBy.BerkeleytimeRatingCount:
+      return "BERKELEYTIME_RATING_COUNT" as CatalogSortBy;
+    case SortBy.APlusAPercent:
+      return "A_PLUS_A_PERCENT" as CatalogSortBy;
+    case SortBy.RmpAverageRating:
+      return "RMP_AVERAGE_RATING" as CatalogSortBy;
     case SortBy.Relevance:
     default:
       return "RELEVANCE" as CatalogSortBy;
@@ -111,6 +131,7 @@ export interface CatalogFilterState {
   timeRange: TimeRange;
   breadths: string[];
   universityRequirements: string[];
+  eecsRequirement: EecsRequirementValue | null;
   gradingFilters: GradingFilter[];
   sortBy: SortBy;
   reverse: boolean;
@@ -130,6 +151,7 @@ export interface CatalogFilterUpdaters {
   updateTimeRange: Dispatch<TimeRange>;
   updateBreadths: Dispatch<string[]>;
   updateUniversityRequirements: Dispatch<string[]>;
+  updateEecsRequirement: Dispatch<EecsRequirementValue | null>;
   updateGradingFilters: Dispatch<GradingFilter[]>;
   updateSortBy: Dispatch<SortBy>;
   updateEnrollmentFilter: Dispatch<EnrollmentFilter | null>;
@@ -156,6 +178,8 @@ export default function useCatalogFilters({
   const [localBreadths, setLocalBreadths] = useState<string[]>([]);
   const [localUniversityRequirements, setLocalUniversityRequirements] =
     useState<string[]>([]);
+  const [localEecsRequirement, setLocalEecsRequirement] =
+    useState<EecsRequirementValue | null>(null);
   const [localGradingFilters, setLocalGradingFilters] = useState<
     GradingFilter[]
   >([]);
@@ -230,6 +254,14 @@ export default function useCatalogFilters({
         : localUniversityRequirements,
     [searchParams, localUniversityRequirements, persistent]
   );
+
+  const eecsRequirement = useMemo((): EecsRequirementValue | null => {
+    if (persistent) {
+      const param = searchParams.get("eecsRequirement");
+      return isEecsRequirementValue(param) ? param : null;
+    }
+    return localEecsRequirement;
+  }, [searchParams, localEecsRequirement, persistent]);
 
   const gradingFilters = useMemo(
     () =>
@@ -312,6 +344,16 @@ export default function useCatalogFilters({
       filters.universityRequirements = universityRequirements;
     }
 
+    if (
+      eecsRequirement === EECS_REQUIREMENT_VALUES.HUMANITIES_SOCIAL_SCIENCES
+    ) {
+      filters.breadths = [...EECS_HUMANITIES_SOCIAL_SCIENCES_BREADTHS];
+    } else if (eecsRequirement === EECS_REQUIREMENT_VALUES.ETHICS) {
+      filters.courseIdentifiers = EECS_ETHICS_COURSES.map(
+        ({ subject, courseNumber }) => ({ subject, courseNumber })
+      );
+    }
+
     if (online) filters.online = true;
 
     return Object.keys(filters).length > 0 ? filters : undefined;
@@ -324,6 +366,7 @@ export default function useCatalogFilters({
     gradingFilters,
     breadths,
     universityRequirements,
+    eecsRequirement,
     online,
   ]);
 
@@ -336,6 +379,7 @@ export default function useCatalogFilters({
     timeRange[1] !== null ||
     breadths.length > 0 ||
     universityRequirements.length > 0 ||
+    eecsRequirement !== null ||
     gradingFilters.length > 0 ||
     enrollmentFilter !== null ||
     online ||
@@ -430,6 +474,7 @@ export default function useCatalogFilters({
     timeRange,
     breadths,
     universityRequirements,
+    eecsRequirement,
     gradingFilters,
     sortBy,
     reverse: localReverse,
@@ -451,6 +496,15 @@ export default function useCatalogFilters({
         setLocalUniversityRequirements,
         reqs
       ),
+    updateEecsRequirement: (value) => {
+      if (persistent) {
+        if (value === null) searchParams.delete("eecsRequirement");
+        else searchParams.set("eecsRequirement", value);
+        setSearchParams(searchParams);
+        return;
+      }
+      setLocalEecsRequirement(value);
+    },
     updateGradingFilters: (filters) =>
       updateArray("gradingBases", setLocalGradingFilters, filters),
     updateSortBy,

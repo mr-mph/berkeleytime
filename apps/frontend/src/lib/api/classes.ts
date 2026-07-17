@@ -160,6 +160,8 @@ export const GET_CLASS = gql`
           instructors {
             familyName
             givenName
+            rmpRating
+            rmpUrl
           }
         }
         exams {
@@ -212,6 +214,8 @@ export const GET_CLASS = gql`
           instructors {
             familyName
             givenName
+            rmpRating
+            rmpUrl
           }
         }
         exams {
@@ -253,6 +257,12 @@ export const GET_CLASS_DETAILS = gql`
       unitsMax
       unitsMin
       finalExam
+      rmpAverageRating
+      requirementDesignation {
+        code
+        description
+        formalDescription
+      }
       decal {
         title
       }
@@ -285,6 +295,18 @@ export const GET_CLASS_DETAILS = gql`
             formalDescription
           }
           value {
+            description
+            formalDescription
+          }
+        }
+        geAttributes: sectionAttributes(attributeCode: "GE") {
+          attribute {
+            code
+            description
+            formalDescription
+          }
+          value {
+            code
             description
             formalDescription
           }
@@ -322,6 +344,8 @@ export const GET_CLASS_DETAILS = gql`
           instructors {
             familyName
             givenName
+            rmpRating
+            rmpUrl
           }
         }
       }
@@ -369,10 +393,13 @@ export const GET_CLASS_SECTIONS = gql`
           instructors {
             familyName
             givenName
+            rmpRating
+            rmpUrl
           }
         }
         enrollment {
           latest {
+            endTime
             enrolledCount
             maxEnroll
             waitlistedCount

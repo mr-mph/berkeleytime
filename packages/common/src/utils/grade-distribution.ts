@@ -218,3 +218,24 @@ export const getPnpPercentageFromCounts = (
 
   return safePass / total;
 };
+
+/** Fraction of letter grades that are A or A+ (0–1), or null if no letter grades. */
+export const getAPlusAPercentage = (counts: GradeCounts): number | null => {
+  const letterTotal =
+    counts.countAPlus +
+    counts.countA +
+    counts.countAMinus +
+    counts.countBPlus +
+    counts.countB +
+    counts.countBMinus +
+    counts.countCPlus +
+    counts.countC +
+    counts.countCMinus +
+    counts.countDPlus +
+    counts.countD +
+    counts.countDMinus +
+    counts.countF;
+
+  if (letterTotal <= 0) return null;
+  return (counts.countAPlus + counts.countA) / letterTotal;
+};

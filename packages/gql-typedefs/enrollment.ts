@@ -17,6 +17,21 @@ export const enrollmentTypeDef = gql`
     ): [EnrollmentTimeframe!]!
   }
 
+  type Mutation {
+    """
+    Fetch live enrollment from classes.berkeley.edu for this class's primary
+    section, persist it, and return the updated enrollment history.
+    """
+    refreshClassEnrollment(
+      year: Int!
+      semester: Semester!
+      sessionId: SessionIdentifier
+      subject: String!
+      courseNumber: CourseNumber!
+      number: ClassNumber!
+    ): Enrollment!
+  }
+
   type EnrollmentTimeframe {
     phase: Int
     isAdjustment: Boolean!
@@ -26,7 +41,7 @@ export const enrollmentTypeDef = gql`
     startEventSummary: String
   }
 
-  type Enrollment @cacheControl(maxAge: 3600) {
+  type Enrollment @cacheControl(maxAge: 60) {
     "Identifiers"
     termId: TermIdentifier!
     year: Int!

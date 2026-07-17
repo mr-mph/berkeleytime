@@ -98,8 +98,12 @@ datapuller:
       args: ["--puller=grades-recent"]
 
     enrollments:
-      schedule: "0/15 * * * *"
+      schedule: "*/5 * * * *"
       args: ["--puller=enrollments"]
+
+    ucb-catalog-enrollments:
+      schedule: "15 * * * *"
+      args: ["--puller=ucb-catalog-enrollments"]
 
     enrollment-timeframe:
       schedule: "40 4 * * *"

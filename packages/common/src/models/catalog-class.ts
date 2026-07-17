@@ -84,6 +84,7 @@ export interface ICatalogClassItem {
   allTimeAverageGrade?: number | null;
   allTimePassCount?: number | null;
   allTimeNoPassCount?: number | null;
+  allTimeAPlusAPercentage?: number | null;
 
   // Primary section fields
   primarySectionId?: string;
@@ -111,6 +112,8 @@ export interface ICatalogClassItem {
   waitlistedCount?: number;
   maxWaitlist?: number;
   activeReservedMaxCount?: number;
+  /** When primary enrollment was last scraped/updated. */
+  enrollmentUpdatedAt?: Date | null;
 
   // Secondary sections
   sections?: ICatalogClassSection[];
@@ -122,6 +125,11 @@ export interface ICatalogClassItem {
 
   // Pre-computed sort fields
   openSeats?: number;
+  berkeleytimeAverageRating?: number | null;
+  berkeleytimeRatingCount?: number;
+  rmpAverageRating?: number | null;
+  /** Instructors with a real RMP score (excludes N/A counted as 3 for sort). */
+  rmpMatchedInstructorCount?: number;
 
   // Ratings/grades
   viewCount?: number;
@@ -174,6 +182,7 @@ const catalogClassSchema = new Schema<ICatalogClassItem>(
     allTimeAverageGrade: { type: Number, default: null },
     allTimePassCount: { type: Number, default: null },
     allTimeNoPassCount: { type: Number, default: null },
+    allTimeAPlusAPercentage: { type: Number, default: null },
 
     // Primary section fields
     primarySectionId: { type: String },
@@ -242,6 +251,7 @@ const catalogClassSchema = new Schema<ICatalogClassItem>(
     waitlistedCount: { type: Number },
     maxWaitlist: { type: Number },
     activeReservedMaxCount: { type: Number },
+    enrollmentUpdatedAt: { type: Date, default: null },
 
     // Secondary sections
     sections: [
@@ -285,6 +295,10 @@ const catalogClassSchema = new Schema<ICatalogClassItem>(
 
     // Pre-computed sort fields
     openSeats: { type: Number, default: 0 },
+    berkeleytimeAverageRating: { type: Number, default: null },
+    berkeleytimeRatingCount: { type: Number, default: 0 },
+    rmpAverageRating: { type: Number, default: null },
+    rmpMatchedInstructorCount: { type: Number, default: 0 },
 
     // Ratings/grades
     viewCount: { type: Number, default: 0 },

@@ -40,7 +40,14 @@ export async function fetchPaginatedData<
           .then((response: any) => response.json())
           .then((data: any) => responseProcessor(data))
           .catch((error: any) => {
-            logger.warn(`Error fetching page ${page + i}: ${error.message}`);
+            const status = error?.status ?? error?.response?.status;
+            const statusText = error?.statusText ?? error?.response?.statusText;
+            const message =
+              error?.message ??
+              (status != null
+                ? `HTTP ${status}${statusText ? ` ${statusText}` : ""}`
+                : String(error));
+            logger.warn(`Error fetching page ${page + i}: ${message}`);
             errorCount++;
             return [];
           })
@@ -55,6 +62,7 @@ export async function fetchPaginatedData<
 
   const processBatch = async (termId?: string) => {
     const [batchData, errorCount] = await fetchBatch(termId);
+    totalErrorCount += errorCount;
     if (batchData.length === 0) return false;
 
     const transformedData = batchData.reduce((acc, item, index) => {

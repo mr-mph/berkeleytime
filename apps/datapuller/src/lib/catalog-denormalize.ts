@@ -15,9 +15,19 @@ import {
   ICatalogClassItem,
   ISectionItem,
   NewEnrollmentHistoryModel,
+  RmpProfessorModel,
   SectionModel,
   TermModel,
 } from "@repo/common/models";
+import {
+  RMP_MISSING_RATING_FOR_SORT,
+  getBerkeleytimeAverageRating,
+  getBerkeleytimeRatingCount,
+  instructorLookupKey,
+  isLsBreadthRequirement,
+  isUniversityRequirementLabel,
+  normalizeInstructorName,
+} from "@repo/shared";
 
 import { Config } from "../shared/config";
 import { computeActiveReservedMaxCount } from "./enrollment-utils";
@@ -300,19 +310,34 @@ export const buildCatalogClasses = async (
       }
     }
 
-    // Extract breadth requirements from section attributes
+    // Extract L&S breadths from GE section attributes (exclude university reqs
+    // like American Cultures that SIS sometimes tags as GE).
     const breadthRequirements: string[] = [];
     const sectionAttributes = primarySection.sectionAttributes ?? [];
     for (const attr of sectionAttributes) {
-      if (attr.attribute?.code === "GE" && attr.value?.description) {
+      if (
+        attr.attribute?.code === "GE" &&
+        attr.value?.description &&
+        isLsBreadthRequirement(attr.value.description)
+      ) {
         breadthRequirements.push(attr.value.description);
       }
     }
 
-    // Extract university requirements from requirement designation
+    // Extract university requirements from requirement designation + GE labels
     const universityRequirements: string[] = [];
     if (_class.requirementDesignation?.description) {
       universityRequirements.push(_class.requirementDesignation.description);
+    }
+    for (const attr of sectionAttributes) {
+      if (
+        attr.attribute?.code === "GE" &&
+        attr.value?.description &&
+        isUniversityRequirementLabel(attr.value.description) &&
+        !universityRequirements.includes(attr.value.description)
+      ) {
+        universityRequirements.push(attr.value.description);
+      }
     }
 
     // Build searchable names
@@ -378,6 +403,7 @@ export const buildCatalogClasses = async (
       allTimeAverageGrade: course.allTimeAverageGrade ?? null,
       allTimePassCount: course.allTimePassCount ?? null,
       allTimeNoPassCount: course.allTimeNoPassCount ?? null,
+      allTimeAPlusAPercentage: course.allTimeAPlusAPercentage ?? null,
 
       // Primary section fields
       primarySectionId: primarySection.sectionId,
@@ -408,6 +434,9 @@ export const buildCatalogClasses = async (
       waitlistedCount: latestEnrollment?.waitlistedCount,
       maxWaitlist: latestEnrollment?.maxWaitlist,
       activeReservedMaxCount,
+      enrollmentUpdatedAt: latestEnrollment?.endTime
+        ? new Date(latestEnrollment.endTime)
+        : null,
 
       // Pre-computed sort fields
       openSeats: Math.max(
@@ -415,6 +444,14 @@ export const buildCatalogClasses = async (
         (latestEnrollment?.maxEnroll ?? 0) -
           (latestEnrollment?.enrolledCount ?? 0)
       ),
+      berkeleytimeAverageRating: ratingsMap.has(_class.courseId)
+        ? getBerkeleytimeAverageRating(ratingsMap.get(_class.courseId)!)
+        : null,
+      berkeleytimeRatingCount: ratingsMap.has(_class.courseId)
+        ? getBerkeleytimeRatingCount(ratingsMap.get(_class.courseId)!)
+        : 0,
+      rmpAverageRating: null,
+      rmpMatchedInstructorCount: 0,
 
       // Secondary sections
       sections: formattedSections,
@@ -482,6 +519,9 @@ export const refreshCatalogClasses = async (
   } finally {
     await session.endSession();
   }
+
+  // Re-apply RMP averages if the professor cache has been populated.
+  await updateCatalogRmpRatings(log, year, semester);
 };
 
 /**
@@ -560,7 +600,13 @@ export const updateCatalogRatings = async (
     bulkOps.push({
       updateMany: {
         filter: { year, semester, courseId },
-        update: { $set: { aggregatedRatings: { metrics } } },
+        update: {
+          $set: {
+            aggregatedRatings: { metrics },
+            berkeleytimeAverageRating: getBerkeleytimeAverageRating(metrics),
+            berkeleytimeRatingCount: getBerkeleytimeRatingCount(metrics),
+          },
+        },
       },
     });
   }
@@ -572,7 +618,13 @@ export const updateCatalogRatings = async (
     bulkOps.push({
       updateMany: {
         filter: { year, semester, courseId: { $in: courseIdsWithoutRatings } },
-        update: { $set: { aggregatedRatings: null } },
+        update: {
+          $set: {
+            aggregatedRatings: null,
+            berkeleytimeAverageRating: null,
+            berkeleytimeRatingCount: 0,
+          },
+        },
       },
     });
   }
@@ -603,6 +655,7 @@ export const updateCatalogGradeSummaries = async (log: Config["log"]) => {
       allTimeAverageGrade: 1,
       allTimePassCount: 1,
       allTimeNoPassCount: 1,
+      allTimeAPlusAPercentage: 1,
     })
     .lean();
 
@@ -621,6 +674,7 @@ export const updateCatalogGradeSummaries = async (log: Config["log"]) => {
             allTimeAverageGrade: course.allTimeAverageGrade ?? null,
             allTimePassCount: course.allTimePassCount ?? null,
             allTimeNoPassCount: course.allTimeNoPassCount ?? null,
+            allTimeAPlusAPercentage: course.allTimeAPlusAPercentage ?? null,
           },
         },
       },
@@ -640,6 +694,7 @@ export const updateCatalogGradeSummaries = async (log: Config["log"]) => {
             allTimeAverageGrade: null,
             allTimePassCount: null,
             allTimeNoPassCount: null,
+            allTimeAPlusAPercentage: null,
           },
         },
       },
@@ -680,6 +735,7 @@ export const updateCatalogEnrollment = async (
       waitlistedCount?: number;
       maxWaitlist?: number;
       activeReservedMaxCount?: number;
+      enrollmentUpdatedAt?: Date;
     }
   >
 ) => {
@@ -705,6 +761,9 @@ export const updateCatalogEnrollment = async (
             maxWaitlist: enrollment.maxWaitlist,
             activeReservedMaxCount: enrollment.activeReservedMaxCount,
             openSeats,
+            ...(enrollment.enrollmentUpdatedAt
+              ? { enrollmentUpdatedAt: enrollment.enrollmentUpdatedAt }
+              : {}),
           },
         },
       },
@@ -735,4 +794,131 @@ export const updateCatalogEnrollment = async (
       `Updated enrollment for ${sectionEnrollments.size} sections on catalog_classes (${result.modifiedCount} docs modified)`
     );
   }
+};
+
+/**
+ * Match primary instructors on catalog classes to cached RMP professors and
+ * set rmpAverageRating for sorting (missing/N/A instructors count as 3).
+ * Also stores how many instructors had a real RMP rating for display.
+ */
+export const updateCatalogRmpRatings = async (
+  log: Config["log"],
+  year?: number,
+  semester?: string
+) => {
+  const professors = await RmpProfessorModel.find({
+    numRatings: { $gt: 0 },
+    avgRating: { $ne: null },
+  })
+    .select({ firstName: 1, lastName: 1, avgRating: 1, numRatings: 1 })
+    .lean();
+
+  if (professors.length === 0) {
+    log.info("No RMP professors cached; skipping catalog RMP average update.");
+    return;
+  }
+
+  const ratingByName = new Map<string, number>();
+  for (const professor of professors) {
+    if (professor.avgRating == null) continue;
+    const key = instructorLookupKey(professor.firstName, professor.lastName);
+    if (!ratingByName.has(key)) {
+      ratingByName.set(key, professor.avgRating);
+    }
+  }
+
+  // Also index by last name only for single-match fallbacks.
+  const ratingsByLastName = new Map<string, number[]>();
+  for (const professor of professors) {
+    if (professor.avgRating == null) continue;
+    const last = normalizeInstructorName(professor.lastName);
+    if (!last) continue;
+    const list = ratingsByLastName.get(last) ?? [];
+    list.push(professor.avgRating);
+    ratingsByLastName.set(last, list);
+  }
+
+  const catalogFilter: Record<string, unknown> = {};
+  if (year != null && semester != null) {
+    catalogFilter.year = year;
+    catalogFilter.semester = semester;
+  }
+
+  const catalogClasses = await CatalogClassModel.find(catalogFilter)
+    .select({ _id: 1, meetings: 1 })
+    .lean();
+
+  const bulkOps: Parameters<typeof CatalogClassModel.bulkWrite>[0] = [];
+
+  for (const catalogClass of catalogClasses) {
+    const sortRatings: number[] = [];
+    let matchedCount = 0;
+    const instructors =
+      catalogClass.meetings?.flatMap((meeting) => meeting.instructors ?? []) ??
+      [];
+
+    for (const instructor of instructors) {
+      const given = instructor.givenName?.trim() ?? "";
+      const family = instructor.familyName?.trim() ?? "";
+      if (!family) continue;
+
+      let rating: number | null = null;
+
+      if (given) {
+        const exact = ratingByName.get(instructorLookupKey(given, family));
+        if (exact != null) {
+          rating = exact;
+        }
+      }
+
+      if (rating == null) {
+        const lastOnly = ratingsByLastName.get(normalizeInstructorName(family));
+        if (lastOnly?.length === 1) {
+          rating = lastOnly[0];
+        }
+      }
+
+      if (rating != null) {
+        matchedCount += 1;
+        sortRatings.push(rating);
+      } else {
+        // N/A on RMP: neutral midpoint for ranking, not treated as a real score.
+        sortRatings.push(RMP_MISSING_RATING_FOR_SORT);
+      }
+    }
+
+    const rmpAverageRating =
+      sortRatings.length > 0
+        ? sortRatings.reduce((sum, value) => sum + value, 0) /
+          sortRatings.length
+        : null;
+
+    bulkOps.push({
+      updateOne: {
+        filter: { _id: catalogClass._id },
+        update: {
+          $set: {
+            rmpAverageRating,
+            rmpMatchedInstructorCount: matchedCount,
+          },
+        },
+      },
+    });
+  }
+
+  if (bulkOps.length === 0) return;
+
+  const BULK_BATCH_SIZE = 500;
+  let modifiedCount = 0;
+  for (let i = 0; i < bulkOps.length; i += BULK_BATCH_SIZE) {
+    const batch = bulkOps.slice(i, i + BULK_BATCH_SIZE);
+    const result = await CatalogClassModel.bulkWrite(batch, { ordered: false });
+    modifiedCount += result.modifiedCount;
+  }
+
+  const scope =
+    year != null && semester != null ? `${year} ${semester}` : "all terms";
+  log.info(
+    `Updated RMP averages for ${catalogClasses.length.toLocaleString()} catalog classes (${scope}, ${modifiedCount.toLocaleString()} docs modified, ${ratingByName.size.toLocaleString()} RMP professors indexed)`
+  );
 };

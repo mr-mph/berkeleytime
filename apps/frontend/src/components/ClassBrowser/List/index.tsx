@@ -35,6 +35,8 @@ const adaptForClassCard = (_class: ICatalogClassServer) => {
     unitsMax: _class.unitsMax,
     unitsMin: _class.unitsMin,
     decal: _class.decal,
+    rmpAverageRating: _class.rmpAverageRating,
+    rmpMatchedInstructorCount: _class.rmpMatchedInstructorCount,
     course: {
       title: _class.courseTitle,
       gradeDistribution:
@@ -52,6 +54,7 @@ const adaptForClassCard = (_class: ICatalogClassServer) => {
           enrolledCount: _class.enrolledCount,
           maxEnroll: _class.maxEnroll,
           activeReservedMaxCount: _class.activeReservedMaxCount,
+          endTime: _class.enrollmentUpdatedAt ?? undefined,
         },
       },
     },

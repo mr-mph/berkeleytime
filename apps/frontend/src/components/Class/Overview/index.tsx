@@ -1,6 +1,15 @@
 import { useMemo } from "react";
 
-import { Box, Container, Flex } from "@repo/theme";
+import classNames from "classnames";
+
+import {
+  filterLsBreadthRequirements,
+  filterUniversityRequirementLabels,
+  getEecsHumanitiesBreadthsMet,
+  meetsEecsEthics,
+  meetsEecsHumanitiesSocialSciences,
+} from "@repo/shared";
+import { Badge, Box, Container, Flex } from "@repo/theme";
 
 import Details from "@/components/Details";
 import useClass from "@/hooks/useClass";
@@ -71,6 +80,51 @@ export default function Overview() {
     () => _class.primarySection?.sectionAttributes ?? [],
     [_class.primarySection?.sectionAttributes]
   );
+
+  const geRequirementLabels = useMemo(() => {
+    const geAttributes = _class.primarySection?.geAttributes ?? [];
+    return geAttributes
+      .map((attribute) => attribute.value?.description?.trim() ?? "")
+      .filter(Boolean);
+  }, [_class.primarySection?.geAttributes]);
+
+  const breadthRequirements = useMemo(
+    () => filterLsBreadthRequirements(geRequirementLabels),
+    [geRequirementLabels]
+  );
+
+  const universityRequirements = useMemo(() => {
+    const fromDesignation =
+      _class.requirementDesignation?.description?.trim() ||
+      _class.requirementDesignation?.formalDescription?.trim();
+    const fromGe = filterUniversityRequirementLabels(geRequirementLabels);
+    const combined = new Set<string>([
+      ...(fromDesignation ? [fromDesignation] : []),
+      ...fromGe,
+    ]);
+    return Array.from(combined);
+  }, [_class.requirementDesignation, geRequirementLabels]);
+
+  const humanitiesBreadthsMet = useMemo(
+    () => getEecsHumanitiesBreadthsMet(breadthRequirements),
+    [breadthRequirements]
+  );
+
+  const meetsHumanitiesSocialSciences = useMemo(
+    () => meetsEecsHumanitiesSocialSciences(breadthRequirements),
+    [breadthRequirements]
+  );
+
+  const meetsEthics = useMemo(
+    () => meetsEecsEthics(_class.subject, _class.courseNumber),
+    [_class.subject, _class.courseNumber]
+  );
+
+  const hasRequirementsMet =
+    universityRequirements.length > 0 ||
+    breadthRequirements.length > 0 ||
+    meetsHumanitiesSocialSciences ||
+    meetsEthics;
 
   const prereqs = useMemo(() => {
     if (course.requirements && course.requirements.trim()) {
@@ -193,6 +247,87 @@ export default function Overview() {
             <Flex direction="column" gap="2">
               <p className={styles.label}>Prerequisites</p>
               <p className={styles.description}>{prereqs}</p>
+            </Flex>
+          )}
+          {hasRequirementsMet && (
+            <Flex direction="column" gap="2">
+              <p className={styles.label}>Requirements Met</p>
+              <div className={styles.requirementsGroups}>
+                {universityRequirements.length > 0 && (
+                  <div className={styles.requirementGroup}>
+                    <p className={styles.requirementGroupLabel}>
+                      University Requirements
+                    </p>
+                    <div className={styles.requirementTags}>
+                      {universityRequirements.map((requirement) => (
+                        <Badge
+                          key={requirement}
+                          label={requirement}
+                          color="blue"
+                          variant="border"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {breadthRequirements.length > 0 && (
+                  <div className={styles.requirementGroup}>
+                    <p className={styles.requirementGroupLabel}>
+                      L&S Breadths
+                    </p>
+                    <div className={styles.requirementTags}>
+                      {breadthRequirements.map((breadth) => (
+                        <Badge
+                          key={breadth}
+                          label={breadth}
+                          color="purple"
+                          variant="border"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className={styles.requirementGroup}>
+                  <p className={styles.requirementGroupLabel}>EECS</p>
+                  <div className={styles.requirementStatusList}>
+                    <div className={styles.requirementStatusRow}>
+                      <span className={styles.requirementStatusName}>
+                        Humanities/Social Sciences
+                      </span>
+                      <span
+                        className={classNames(styles.requirementStatusValue, {
+                          [styles.requirementStatusValueYes]:
+                            meetsHumanitiesSocialSciences,
+                          [styles.requirementStatusValueNo]:
+                            !meetsHumanitiesSocialSciences,
+                        })}
+                      >
+                        {meetsHumanitiesSocialSciences ? "Yes" : "No"}
+                        {meetsHumanitiesSocialSciences &&
+                          humanitiesBreadthsMet.length > 0 && (
+                            <span className={styles.requirementStatusDetail}>
+                              {" "}
+                              ({humanitiesBreadthsMet.join(", ")})
+                            </span>
+                          )}
+                      </span>
+                    </div>
+                    <div className={styles.requirementStatusRow}>
+                      <span className={styles.requirementStatusName}>
+                        Ethics
+                      </span>
+                      <span
+                        className={classNames(styles.requirementStatusValue, {
+                          [styles.requirementStatusValueYes]: meetsEthics,
+                          [styles.requirementStatusValueNo]: !meetsEthics,
+                        })}
+                      >
+                        {meetsEthics ? "Yes" : "No"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </Flex>
           )}
           <Flex direction="column" gap="2">

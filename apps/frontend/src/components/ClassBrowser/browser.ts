@@ -5,6 +5,10 @@ export enum SortBy {
   Units = "Units",
   AverageGrade = "Average grade",
   OpenSeats = "Open seats",
+  BerkeleytimeAverageRating = "Avg rating (Berkeleytime)",
+  BerkeleytimeRatingCount = "# of ratings (Berkeleytime)",
+  APlusAPercent = "A/A+ percent",
+  RmpAverageRating = "Rate My Professor rating",
 }
 
 export enum Level {
@@ -12,6 +16,7 @@ export enum Level {
   UpperDivision = "Upper Division",
   Graduate = "Graduate",
   Extension = "Extension",
+  DeCal = "DeCal",
 }
 
 export enum Unit {

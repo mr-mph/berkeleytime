@@ -3,6 +3,7 @@ import { Outlet } from "react-router";
 import { Flex } from "@repo/theme";
 
 import Banner from "@/components/Banner";
+import EnrollmentScrapeStatusBar from "@/components/EnrollmentScrapeStatusBar";
 import Footer from "@/components/Footer";
 import NavigationBar from "@/components/NavigationBar";
 import { useHeaderHeight } from "@/hooks/useHeaderHeight";
@@ -38,6 +39,7 @@ export default function Layout({
         {(showBanner || header) && (
           <div ref={headerRef} className={styles.stickyHeader}>
             {showBanner && <Banner />}
+            {header && <EnrollmentScrapeStatusBar />}
             {header && <NavigationBar noBorder={!headerBorder} />}
           </div>
         )}

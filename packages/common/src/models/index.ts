@@ -22,3 +22,5 @@ export * from "./route-redirect";
 export * from "./click-event";
 export * from "./targeted-message";
 export * from "./catalog-class";
+export * from "./rmp-professor";
+export * from "./ucb-enrollment-scrape-status";

@@ -1,5 +1,7 @@
 import { Dispatch, SetStateAction, createContext, useContext } from "react";
 
+import type { EecsRequirementValue } from "@repo/shared";
+
 import { ITerm } from "@/lib/api";
 import { ICatalogFilterOptions } from "@/lib/api/catalog";
 import { Semester } from "@/lib/generated/graphql";
@@ -24,6 +26,7 @@ export interface FilterContextType {
   timeRange: TimeRange;
   breadths: string[];
   universityRequirements: string[];
+  eecsRequirement: EecsRequirementValue | null;
   gradingFilters: GradingFilter[];
   sortBy: SortBy;
   reverse: boolean;
@@ -38,6 +41,7 @@ export interface FilterContextType {
   updateTimeRange: Dispatch<TimeRange>;
   updateBreadths: Dispatch<string[]>;
   updateUniversityRequirements: Dispatch<string[]>;
+  updateEecsRequirement: Dispatch<EecsRequirementValue | null>;
   updateGradingFilters: Dispatch<GradingFilter[]>;
   updateSortBy: Dispatch<SortBy>;
   updateEnrollmentFilter: Dispatch<EnrollmentFilter | null>;

@@ -120,6 +120,7 @@ export interface ICourseItem {
   allTimeAverageGrade?: number | null;
   allTimePassCount?: number | null;
   allTimeNoPassCount?: number | null;
+  allTimeAPlusAPercentage?: number | null;
 }
 
 export interface ICourseItemDocument extends ICourseItem, Document {}
@@ -220,6 +221,7 @@ const courseSchema = new Schema<ICourseItem>({
   allTimeAverageGrade: { type: Number, default: null },
   allTimePassCount: { type: Number, default: null },
   allTimeNoPassCount: { type: Number, default: null },
+  allTimeAPlusAPercentage: { type: Number, default: null },
 });
 
 // for catalog, associated courses by id, curated class controllers
