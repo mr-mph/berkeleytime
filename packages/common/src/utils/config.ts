@@ -1,6 +1,32 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import dotenv from "dotenv";
 
-dotenv.config();
+const loadEnvFiles = () => {
+  const configDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    // Repo root from packages/common/src/utils -> ../../../.env
+    path.resolve(configDir, "../../../.env"),
+    // CWD is apps/<service> (turbo) with a local .env
+    path.resolve(process.cwd(), ".env"),
+    // CWD is apps/<service> but env is mounted at workspace root
+    path.resolve(process.cwd(), "../../.env"),
+  ];
+
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    if (!fs.existsSync(candidate)) continue;
+    dotenv.config({ path: candidate, override: false });
+  }
+
+  dotenv.config({ override: false });
+};
+
+loadEnvFiles();
 
 // Safely get the environment variable in the process
 const env = (name: string): string => {

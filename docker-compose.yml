@@ -17,6 +17,11 @@ services:
     networks:
       - bt
     restart: always
+    # Inject secrets via env_file. Avoid nesting a file bind inside the app
+    # directory bind — Docker Desktop VirtioFS fails with "mountpoint is
+    # outside of rootfs" on that pattern.
+    env_file:
+      - .env
     healthcheck:
       test:
         - CMD
@@ -28,7 +33,7 @@ services:
       start_period: 20s
       retries: 20
     volumes:
-      - ./.env:/backend/apps/backend/.env
+      - ./.env:/backend/.env
       - ./apps/backend:/backend/apps/backend
       - ./packages:/backend/packages
   # Live datapullers for local/dev (scheduled loops; skips last-five-years jobs)
@@ -45,10 +50,14 @@ services:
     networks:
       - bt
     restart: always
+    env_file:
+      - .env
     environment:
       - BACKEND_URL=http://backend:5001
     volumes:
-      - ./.env:/datapuller/apps/datapuller/.env
+      # Mount at workspace root (not under apps/datapuller) to avoid VirtioFS
+      # nested file-on-dir bind failures on Docker Desktop for Mac.
+      - ./.env:/datapuller/.env
       - ./apps/datapuller:/datapuller/apps/datapuller
       - ./packages:/datapuller/packages
     entrypoint: ["/bin/sh", "./apps/datapuller/scripts/dev-scheduler.sh"]
@@ -187,7 +196,7 @@ services:
       - -ec
       - |
         attempts=0
-        until mongosh "mongodb://mongodb:27017/bt" /scripts/01-create-search-indexes.js; do
+        until mongosh "mongodb://mongodb:27017/bt" /scripts/01-create-search-indexes.js /scripts/02-seed-dev-users.js; do
           attempts=$$((attempts + 1))
           if [ "$$attempts" -ge 30 ]; then
             echo "mongodb-init failed after $$attempts attempts."

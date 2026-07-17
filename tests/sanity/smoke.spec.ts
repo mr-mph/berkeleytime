@@ -9,7 +9,7 @@ test("homepage loads successfully", async ({ page }) => {
   await page.goto("/");
 
   // Verify the page loads and has the expected title
-  await expect(page).toHaveTitle(/Berkeleytime/i);
+  await expect(page).toHaveTitle(/EECStime/i);
 });
 
 test("can navigate to catalog page", async ({ page }) => {

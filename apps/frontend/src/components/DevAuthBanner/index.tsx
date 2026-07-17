@@ -51,11 +51,19 @@ export default function DevAuthBanner() {
     setDevAuthCollapsed(newCollapsed);
   };
 
-  const filteredUsers = devUsers.filter(
-    (u) =>
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = [...devUsers]
+    .filter(
+      (u) =>
+        u.email.toLowerCase().includes(search.toLowerCase()) ||
+        u.name.toLowerCase().includes(search.toLowerCase())
+    )
+    // Pin local seed accounts above restored prod users in the switcher.
+    .sort((a, b) => {
+      const aLocal = a.email.endsWith("@berkeleytime.local") ? 0 : 1;
+      const bLocal = b.email.endsWith("@berkeleytime.local") ? 0 : 1;
+      if (aLocal !== bLocal) return aLocal - bLocal;
+      return a.name.localeCompare(b.name);
+    });
 
   if (collapsed) {
     return (
