@@ -17,7 +17,6 @@ import {
 } from "@/lib/banner";
 
 import styles from "./Banner.module.scss";
-import BetaBanner from "./BetaBanner";
 
 export default function Banner() {
   const { data: banners, loading, error } = useAllBanners();
@@ -103,7 +102,7 @@ export default function Banner() {
   };
 
   if (!activeBanner) {
-    return <BetaBanner />;
+    return null;
   }
 
   // Use redirect-based click tracking for reliable 100% tracking
