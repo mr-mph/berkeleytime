@@ -1,12 +1,12 @@
 /**
  * L&S breadth vs university requirement classification.
  *
- * SIS sometimes puts university designations (e.g. American Cultures) on
- * section attributes with attribute code "GE". Use these helpers so those
- * are not treated as L&S breadths.
+ * SIS sometimes puts university / college designations (e.g. American Cultures,
+ * Reading and Composition) on section attributes with attribute code "GE".
+ * Use these helpers so those are not treated as L&S seven-course breadths.
  */
 
-/** Canonical L&S / GE breadth labels used in catalog data. */
+/** Canonical L&S seven-course breadth labels used in catalog data. */
 export const LS_BREADTH_REQUIREMENTS = [
   "Arts & Literature",
   "Biological Science",
@@ -17,11 +17,9 @@ export const LS_BREADTH_REQUIREMENTS = [
   "Physical Science",
   "Social & Behavioral Science",
   "Social & Behavioral Sciences",
-  "Reading and Composition A",
-  "Reading and Composition B",
 ] as const;
 
-/** University requirement labels that may also appear on GE attributes. */
+/** University / college requirement labels that may also appear on GE attributes. */
 export const UNIVERSITY_REQUIREMENT_LABELS = [
   "American Cultures",
   "American History",
@@ -30,6 +28,8 @@ export const UNIVERSITY_REQUIREMENT_LABELS = [
   "Entry-Level Writing",
   "Quantitative Reasoning",
   "Foreign Language",
+  "Reading and Composition A",
+  "Reading and Composition B",
 ] as const;
 
 const LS_BREADTH_SET = new Set<string>(LS_BREADTH_REQUIREMENTS);
