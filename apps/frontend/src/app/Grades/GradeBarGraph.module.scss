@@ -102,7 +102,7 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 0;
-  max-width: 420px;
+  max-width: 350px;
   min-width: 180px;
 }
 
@@ -125,20 +125,10 @@
 
 .tooltipItem {
   display: flex;
-  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 4px 12px;
+  gap: 12px;
   font-size: var(--text-14);
-}
-
-// values group right-aligned; wraps below the label as one unit when narrow
-.tooltipItemStats {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px 10px;
-  margin-left: auto;
 }
 
 .tooltipItemLabel {

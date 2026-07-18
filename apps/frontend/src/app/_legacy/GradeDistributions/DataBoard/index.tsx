@@ -62,53 +62,47 @@ export default function DataBoard({
     upper: upperPercentile,
     count: hoveredCount,
     total: gradeDistTotal,
-    percent: hoveredPercent,
   } = useMemo(() => {
     const ret: {
       lower: string | null;
       upper: string | null;
       count: number | null;
       total: number;
-      percent: number;
-    } = { lower: null, upper: null, count: null, total: 0, percent: 0 };
+    } = { lower: null, upper: null, count: null, total: 0 };
     if (!gradeDistribution || !hoveredLetter) return ret;
 
-    // Raw counts feed the "count/total" display; percentile and percentage
-    // math follow the API's recency-weighted percentage field so they agree
-    // with the chart bars. Both exclude P/NP grades.
-    let letterShare = 0;
-    gradeDistribution.distribution?.forEach((g) => {
-      // Only count letter grades (A+ through F), exclude P and NP
-      if (LETTER_GRADES.includes(g.letter as (typeof LETTER_GRADES)[number])) {
-        ret.total += g.count;
-        letterShare += g.percentage;
-      }
-    });
+    // Calculate total excluding P/NP grades
+    ret.total =
+      gradeDistribution.distribution?.reduce((acc, g) => {
+        // Only count letter grades (A+ through F), exclude P and NP
+        if (
+          LETTER_GRADES.includes(g.letter as (typeof LETTER_GRADES)[number])
+        ) {
+          return acc + g.count;
+        }
+        return acc;
+      }, 0) ?? 0;
 
     // Use only letter grades for percentile calculation
     LETTER_GRADES.reduce((acc, grade) => {
       if (grade === hoveredLetter) {
         const upperValue =
-          letterShare > 0
-            ? (((letterShare - acc) * 100) / letterShare).toFixed(0)
+          ret.total > 0
+            ? (((ret.total - acc) * 100) / ret.total).toFixed(0)
             : "0";
         ret.upper = addOrdinalSuffix(upperValue);
       }
-      const hoveredGrade = gradeDistribution.distribution?.find(
-        (g) => g.letter === grade
-      );
-      acc += hoveredGrade?.percentage ?? 0;
+      const count =
+        gradeDistribution.distribution?.find((g) => g.letter === grade)
+          ?.count ?? 0;
+      acc += count;
       if (grade === hoveredLetter) {
         const lowerValue =
-          letterShare > 0
-            ? (((letterShare - acc) * 100) / letterShare).toFixed(0)
+          ret.total > 0
+            ? (((ret.total - acc) * 100) / ret.total).toFixed(0)
             : "0";
         ret.lower = addOrdinalSuffix(lowerValue);
-        ret.count = hoveredGrade?.count ?? 0;
-        ret.percent =
-          letterShare > 0
-            ? ((hoveredGrade?.percentage ?? 0) / letterShare) * 100
-            : 0;
+        ret.count = count;
       }
       return acc;
     }, 0);
@@ -169,16 +163,16 @@ export default function DataBoard({
         value: (
           <>
             <ColoredGrade style={GRADE_STYLE} grade={hoveredLetter} />(
-            {hoveredCount}/{gradeDistTotal}, {hoveredPercent.toFixed(1)}%)
+            {hoveredCount}/{gradeDistTotal},{" "}
+            {(((hoveredCount ?? 0) / gradeDistTotal) * 100).toFixed(1)}%)
           </>
         ),
       });
     } else {
       // For P/NP grades, just show the count without percentile
-      const pnpGrade = gradeDistribution?.distribution?.find(
-        (g) => g.letter === hoveredLetter
-      );
-      const pnpCount = pnpGrade?.count ?? 0;
+      const pnpCount =
+        gradeDistribution?.distribution?.find((g) => g.letter === hoveredLetter)
+          ?.count ?? 0;
       const totalAll =
         gradeDistribution?.distribution?.reduce((acc, g) => acc + g.count, 0) ??
         0;
@@ -187,8 +181,7 @@ export default function DataBoard({
         value: (
           <>
             <ColoredGrade style={GRADE_STYLE} grade={hoveredLetter} />(
-            {pnpCount}/{totalAll}, {((pnpGrade?.percentage ?? 0) * 100).toFixed(1)}
-            %)
+            {pnpCount}/{totalAll}, {((pnpCount / totalAll) * 100).toFixed(1)}%)
           </>
         ),
       });

@@ -90,16 +90,15 @@ export default function Grades() {
         (grade: GradeEntry) => grade.letter === letter
       );
 
-      // Percentage carries the backend's recency weighting; count is the raw
-      // number of grades given.
-      const coursePercent = courseGrade
-        ? Math.round((courseGrade.percentage ?? 0) * 1000) / 10
-        : 0;
+      const coursePercent =
+        courseTotalCount > 0 && courseGrade
+          ? Math.round(((courseGrade.count ?? 0) / courseTotalCount) * 1000) /
+            10
+          : 0;
 
       return {
         letter,
         course: coursePercent,
-        count: courseGrade?.count ?? 0,
       };
     });
 
@@ -184,13 +183,7 @@ export default function Grades() {
             <ChartTooltip
               tooltipConfig={{
                 labelFormatter: (label) => `Grade: ${label}`,
-                valueFormatter: (value, _name, item) => {
-                  const percent = formatters.percent(value, 1);
-                  const count = item?.payload?.count;
-                  if (typeof count !== "number") return percent;
-                  const gradesLabel = count === 1 ? "grade" : "grades";
-                  return `${percent} · ${count.toLocaleString()} ${gradesLabel}`;
-                },
+                valueFormatter: (value) => formatters.percent(value, 1),
                 indicator: "square",
               }}
             />
