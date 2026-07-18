@@ -270,7 +270,7 @@ export const GET_CLASS_DETAILS = gql`
         title
         description
         requirements
-        aggregatedRatings(metricNames: [Attendance, Recording]) {
+        aggregatedRatings {
           metrics {
             metricName
             count

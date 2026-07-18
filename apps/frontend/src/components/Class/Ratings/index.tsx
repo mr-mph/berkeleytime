@@ -558,7 +558,9 @@ export function RatingsContainer() {
                           : "—"}
                       </p>
                       <RatingCountWithButton
-                        count={classReviewsSummary.count}
+                        count={getMaxMetricCount(
+                          aggregatedRatingsData?.metrics
+                        )}
                         addRatingButton={
                           !userRatings ? (
                             <RatingButton
