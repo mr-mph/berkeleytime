@@ -30,6 +30,11 @@ const BASE_BACKOFF_MS = 500;
 const USER_AGENT = "BerkeleytimeUcbEnrollmentPuller/1.0";
 /** Skip classes scraped within this window so restarts don't re-query them. */
 const RECENT_SCRAPE_TTL_MS = 45 * 60 * 1000;
+/** Hard cap so one wedged class/fetch can't stall the whole pool forever. */
+const CLASS_SCRAPE_TIMEOUT_MS = 120_000;
+/** Don't walk unbounded combinedSections scrape candidates. */
+const MAX_SCRAPE_CANDIDATES = 3;
+const PERSIST_VERSION_RETRIES = 5;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -153,61 +158,83 @@ const persistScrapedSectionEnrollment = async (
     seatReservationCount: scraped.seatReservationCount,
   };
 
-  let enrollmentDoc = await NewEnrollmentHistoryModel.findOne({
-    year,
-    semester,
-    sessionId: section.sessionId,
-    subject: section.subject,
-    courseNumber: section.courseNumber,
-    sectionNumber: section.number,
-  });
+  let seatReservationTypes = scraped.seatReservationTypes;
+  let lastError: unknown;
 
-  if (!enrollmentDoc) {
-    enrollmentDoc = await NewEnrollmentHistoryModel.findOne({
-      termId: section.termId,
-      sessionId: section.sessionId,
-      sectionId: section.sectionId,
-    });
+  for (let attempt = 0; attempt < PERSIST_VERSION_RETRIES; attempt++) {
+    try {
+      let enrollmentDoc = await NewEnrollmentHistoryModel.findOne({
+        year,
+        semester,
+        sessionId: section.sessionId,
+        subject: section.subject,
+        courseNumber: section.courseNumber,
+        sectionNumber: section.number,
+      });
+
+      if (!enrollmentDoc) {
+        enrollmentDoc = await NewEnrollmentHistoryModel.findOne({
+          termId: section.termId,
+          sessionId: section.sessionId,
+          sectionId: section.sectionId,
+        });
+      }
+
+      if (!enrollmentDoc) {
+        enrollmentDoc = await NewEnrollmentHistoryModel.create({
+          termId: section.termId,
+          year,
+          semester,
+          sessionId: section.sessionId,
+          sectionId: section.sectionId,
+          subject: section.subject,
+          courseNumber: section.courseNumber,
+          sectionNumber: section.number,
+          history: [historyPoint],
+          seatReservationTypes: scraped.seatReservationTypes,
+        });
+      } else {
+        const history = enrollmentDoc.history ?? [];
+        const lastEntry = history[history.length - 1];
+
+        if (
+          lastEntry &&
+          enrollmentCountsEqual(lastEntry, historyPoint) &&
+          lastEntry.granularitySeconds === GRANULARITY_SECONDS
+        ) {
+          lastEntry.endTime = now;
+          enrollmentDoc.markModified("history");
+        } else {
+          enrollmentDoc.history = [...history, historyPoint];
+        }
+
+        if (scraped.seatReservationTypes.length > 0) {
+          enrollmentDoc.seatReservationTypes = scraped.seatReservationTypes;
+        }
+
+        await enrollmentDoc.save();
+      }
+
+      seatReservationTypes = enrollmentDoc.seatReservationTypes ?? [];
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      const isVersionError =
+        error instanceof Error &&
+        (error.name === "VersionError" ||
+          /No matching document found for id/.test(error.message));
+      if (!isVersionError || attempt === PERSIST_VERSION_RETRIES - 1) {
+        throw error;
+      }
+    }
   }
 
-  if (!enrollmentDoc) {
-    enrollmentDoc = await NewEnrollmentHistoryModel.create({
-      termId: section.termId,
-      year,
-      semester,
-      sessionId: section.sessionId,
-      sectionId: section.sectionId,
-      subject: section.subject,
-      courseNumber: section.courseNumber,
-      sectionNumber: section.number,
-      history: [historyPoint],
-      seatReservationTypes: scraped.seatReservationTypes,
-    });
-  } else {
-    const history = enrollmentDoc.history ?? [];
-    const lastEntry = history[history.length - 1];
-
-    if (
-      lastEntry &&
-      enrollmentCountsEqual(lastEntry, historyPoint) &&
-      lastEntry.granularitySeconds === GRANULARITY_SECONDS
-    ) {
-      lastEntry.endTime = now;
-      enrollmentDoc.markModified("history");
-    } else {
-      enrollmentDoc.history = [...history, historyPoint];
-    }
-
-    if (scraped.seatReservationTypes.length > 0) {
-      enrollmentDoc.seatReservationTypes = scraped.seatReservationTypes;
-    }
-
-    await enrollmentDoc.save();
-  }
+  if (lastError) throw lastError;
 
   const activeReservedMaxCount = computeActiveReservedMaxCount(
     historyPoint.seatReservationCount,
-    enrollmentDoc.seatReservationTypes
+    seatReservationTypes
   );
 
   return {
@@ -240,37 +267,6 @@ const findCombinedSiblingSections = async (
     sessionId: section.sessionId,
     sectionId: { $in: combinedIds },
   }).lean()) as ISectionItem[];
-};
-
-/** Persist enrollment to a section and every SIS combinedSections sibling. */
-const persistScrapedSectionEnrollmentWithFanOut = async (
-  year: number,
-  semester: string,
-  section: ISectionItem,
-  scraped: ParsedUcbEnrollment,
-  now: Date
-): Promise<Array<{ sectionId: string; patch: CatalogEnrollmentPatch }>> => {
-  const siblings = await findCombinedSiblingSections(section);
-  const targets = [section, ...siblings];
-  const seen = new Set<string>();
-  const results: Array<{ sectionId: string; patch: CatalogEnrollmentPatch }> =
-    [];
-
-  for (const target of targets) {
-    if (seen.has(target.sectionId)) continue;
-    seen.add(target.sectionId);
-    results.push(
-      await persistScrapedSectionEnrollment(
-        year,
-        semester,
-        target,
-        scraped,
-        now
-      )
-    );
-  }
-
-  return results;
 };
 
 const matchAssociatedScrapedEnrollment = (
@@ -312,6 +308,76 @@ const scrapeEnrollmentForSection = async (
   } catch {
     return null;
   }
+};
+
+/**
+ * True only when the sibling's catalog page is confirmed blank (0/0).
+ * False when it has its own enrollment; null on fetch failure (do not fan out).
+ */
+const isSiblingCatalogBlank = async (
+  section: ISectionItem,
+  log: Config["log"]
+): Promise<boolean | null> => {
+  if (!section.component) return true;
+  const url = buildUcbCatalogUrl({
+    year: section.year,
+    semester: section.semester,
+    subject: section.subject,
+    courseNumber: section.courseNumber,
+    number: section.number,
+    component: section.component,
+  });
+  try {
+    const scraped = await fetchWithRetry(url, log);
+    return isBlankUcbEnrollment(scraped.primary);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Persist enrollment to a section, and fan out only to combinedSections siblings
+ * whose own classes.berkeley.edu page is blank (0/0). SIS may put separately
+ * enrolled lectures (e.g. DATA C8 LEC 001 + 002) in the same combination — those
+ * with real seat counts must not be overwritten.
+ */
+const persistScrapedSectionEnrollmentWithFanOut = async (
+  year: number,
+  semester: string,
+  section: ISectionItem,
+  scraped: ParsedUcbEnrollment,
+  now: Date,
+  log: Config["log"]
+): Promise<Array<{ sectionId: string; patch: CatalogEnrollmentPatch }>> => {
+  const siblings = await findCombinedSiblingSections(section);
+  const targets: ISectionItem[] = [section];
+  const seen = new Set<string>([section.sectionId]);
+
+  for (const sibling of siblings) {
+    if (seen.has(sibling.sectionId)) continue;
+    seen.add(sibling.sectionId);
+
+    const blank = await isSiblingCatalogBlank(sibling, log);
+    if (blank !== true) continue;
+
+    targets.push(sibling);
+  }
+
+  const results: Array<{ sectionId: string; patch: CatalogEnrollmentPatch }> =
+    [];
+  for (const target of targets) {
+    results.push(
+      await persistScrapedSectionEnrollment(
+        year,
+        semester,
+        target,
+        scraped,
+        now
+      )
+    );
+  }
+
+  return results;
 };
 
 const isRetryableError = (error: unknown): boolean => {
@@ -588,13 +654,14 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
     const scrapeCandidates = [
       primarySection as ISectionItem,
       ...combinedSiblings,
-    ];
+    ].slice(0, MAX_SCRAPE_CANDIDATES);
 
-    try {
+    const scrapeAndPersist = async (signal: { aborted: boolean }) => {
       let scraped: Awaited<ReturnType<typeof fetchUcbCatalogEnrollment>> | null =
         null;
 
       for (const candidate of scrapeCandidates) {
+        if (signal.aborted) return;
         scraped = await scrapeEnrollmentForSection(candidate, log);
         if (scraped) {
           if (candidate.sectionId !== primarySection.sectionId) {
@@ -605,6 +672,8 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
           break;
         }
       }
+
+      if (signal.aborted) return;
 
       if (!scraped) {
         await bumpProgress(label, "fail");
@@ -626,9 +695,12 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
           catalogClass.semester,
           primarySection as ISectionItem,
           scraped.primary,
-          now
+          now,
+          log
         ))
       );
+
+      if (signal.aborted) return;
 
       if (scraped.associatedSections.length > 0) {
         const associatedBySectionId = new Map(
@@ -667,6 +739,7 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
 
         const seenAssociated = new Set<string>();
         for (const section of associatedSections) {
+          if (signal.aborted) return;
           const match = matchAssociatedScrapedEnrollment(
             section as ISectionItem,
             associatedBySectionId,
@@ -680,7 +753,8 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
             catalogClass.semester,
             section as ISectionItem,
             match,
-            now
+            now,
+            log
           );
           for (const patch of fanOutPatches) {
             seenAssociated.add(patch.sectionId);
@@ -688,6 +762,8 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
           }
         }
       }
+
+      if (signal.aborted) return;
 
       await withPatchLock(async () => {
         for (const { sectionId, patch } of patches) {
@@ -707,6 +783,8 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
         }
       });
 
+      if (signal.aborted) return;
+
       await bumpProgress(label, "success");
 
       if ((index + 1) % 100 === 0 || index === classes.length - 1) {
@@ -714,13 +792,34 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
           `Progress ${index + 1}/${classes.length} (ok=${succeeded}, fail=${failed}, skip=${skipped}) last=${label}`
         );
       }
+    };
+
+    const signal = { aborted: false };
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        scrapeAndPersist(signal),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            signal.aborted = true;
+            reject(
+              new Error(
+                `Timed out after ${CLASS_SCRAPE_TIMEOUT_MS}ms scraping ${label}`
+              )
+            );
+          }, CLASS_SCRAPE_TIMEOUT_MS);
+        }),
+      ]);
     } catch (error) {
+      signal.aborted = true;
       await bumpProgress(label, "fail");
       log.warn(
         `Failed ${label}: ${
           error instanceof Error ? error.message : "unknown error"
         }`
       );
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   });
 

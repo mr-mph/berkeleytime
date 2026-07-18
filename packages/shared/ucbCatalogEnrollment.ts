@@ -252,6 +252,23 @@ export async function fetchUcbCatalogEnrollment(
   const userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
+  const readText = async (response: Response): Promise<string> => {
+    // Headers can succeed while the body stalls; bound the full read.
+    return await Promise.race([
+      response.text(),
+      new Promise<string>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new UcbCatalogEnrollmentError(
+              `Timed out reading Berkeley Catalog body after ${timeoutMs}ms`,
+              "INTERNAL_SERVER_ERROR"
+            )
+          );
+        }, timeoutMs);
+      }),
+    ]);
+  };
+
   let response: Response;
   try {
     response = await fetch(url, {
@@ -277,7 +294,7 @@ export async function fetchUcbCatalogEnrollment(
     );
   }
 
-  const html = await response.text();
+  const html = await readText(response);
   const primary = parseUcbCatalogEnrollment(html);
 
   const nodeId = extractNodeId(html);
@@ -297,7 +314,7 @@ export async function fetchUcbCatalogEnrollment(
     });
     if (associatedResponse.ok) {
       associatedSections = parseAssociatedSectionEnrollments(
-        await associatedResponse.text()
+        await readText(associatedResponse)
       );
     }
   } catch {

@@ -223,6 +223,34 @@ const findCombinedSiblingSections = async (
   }).lean()) as ISectionItem[];
 };
 
+/**
+ * True only when the sibling's catalog page is confirmed blank (0/0).
+ * False when it has its own enrollment; null on fetch failure (do not fan out).
+ */
+const isSiblingCatalogBlank = async (
+  section: ISectionItem
+): Promise<boolean | null> => {
+  if (!section.component) return true;
+  const url = buildUcbCatalogUrl({
+    year: section.year,
+    semester: section.semester as Semester,
+    subject: section.subject,
+    courseNumber: section.courseNumber,
+    number: section.number,
+    component: section.component,
+  });
+  try {
+    const scraped = await fetchUcbCatalogEnrollment(url);
+    return isBlankUcbEnrollment(scraped.primary);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Persist enrollment to a section, and fan out only to combinedSections siblings
+ * whose own classes.berkeley.edu page is blank (0/0).
+ */
 const persistScrapedSectionEnrollmentWithFanOut = async (
   year: number,
   semester: Semester,
@@ -231,13 +259,21 @@ const persistScrapedSectionEnrollmentWithFanOut = async (
   now: Date
 ) => {
   const siblings = await findCombinedSiblingSections(section);
-  const targets = [section, ...siblings];
-  const seen = new Set<string>();
-  let primaryDoc = null;
+  const targets: ISectionItem[] = [section];
+  const seen = new Set<string>([section.sectionId]);
 
+  for (const sibling of siblings) {
+    if (seen.has(sibling.sectionId)) continue;
+    seen.add(sibling.sectionId);
+
+    const blank = await isSiblingCatalogBlank(sibling);
+    if (blank !== true) continue;
+
+    targets.push(sibling);
+  }
+
+  let primaryDoc = null;
   for (const target of targets) {
-    if (seen.has(target.sectionId)) continue;
-    seen.add(target.sectionId);
     const doc = await persistScrapedSectionEnrollment(
       year,
       semester,

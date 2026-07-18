@@ -1,7 +1,7 @@
 #!/bin/sh
 # Local/dev datapuller schedule (lighter than prod; skips last-five-years jobs).
 # Intervals:
-#   enrollments                 every 5 minutes
+#   enrollments (SIS)           disabled locally (needs SIS API keys)
 #   ucb-catalog-enrollments     continuous (no gap between passes)
 #   catalog refresh set         every 12 hours
 #   daily extras                every 24 hours
@@ -20,13 +20,13 @@ run_puller() {
 
 echo "Datapuller dev scheduler started."
 
-# Enrollment: live loop (SIS)
-(
-  while true; do
-    run_puller enrollments
-    sleep 300
-  done
-) &
+# Enrollment: SIS Classes API (disabled locally — requires real SIS_CLASS_APP_* keys).
+# (
+#   while true; do
+#     run_puller enrollments
+#     sleep 300
+#   done
+# ) &
 
 # Enrollment: classes.berkeley.edu scrape (prominence-ordered).
 # Loop continuously; within a pass, recently-scraped classes are skipped (TTL in puller).
