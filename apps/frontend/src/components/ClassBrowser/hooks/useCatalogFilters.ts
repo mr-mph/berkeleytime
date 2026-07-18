@@ -342,11 +342,6 @@ export default function useCatalogFilters({
       filters.gradingFilters = mapGradingFilterToBasisCodes(gradingFilters);
     }
 
-    if (breadths.length > 0) filters.breadths = breadths;
-    if (universityRequirements.length > 0) {
-      filters.universityRequirements = universityRequirements;
-    }
-
     const hasEecsHss = eecsRequirements.includes(
       EECS_REQUIREMENT_VALUES.HUMANITIES_SOCIAL_SCIENCES
     );
@@ -354,22 +349,23 @@ export default function useCatalogFilters({
       EECS_REQUIREMENT_VALUES.ETHICS
     );
 
-    if (hasEecsHss) {
-      const eecsBreadths = [...EECS_HUMANITIES_SOCIAL_SCIENCES_BREADTHS];
-      filters.breadths =
-        breadths.length > 0
-          ? eecsBreadths.filter((breadth) => breadths.includes(breadth))
-          : eecsBreadths;
+    // Requirements are OR'd server-side across breadths, university, and course lists.
+    const breadthFilters = [
+      ...new Set([
+        ...breadths,
+        ...(hasEecsHss ? EECS_HUMANITIES_SOCIAL_SCIENCES_BREADTHS : []),
+      ]),
+    ];
+    if (breadthFilters.length > 0) filters.breadths = breadthFilters;
+
+    if (universityRequirements.length > 0) {
+      filters.universityRequirements = universityRequirements;
     }
 
     if (hasEecsEthics) {
       filters.courseIdentifiers = EECS_ETHICS_COURSES.map(
         ({ subject, courseNumber }) => ({ subject, courseNumber })
       );
-    }
-
-    if (hasEecsHss && hasEecsEthics) {
-      filters.orBreadthsWithCourseIdentifiers = true;
     }
 
     if (online) filters.online = true;

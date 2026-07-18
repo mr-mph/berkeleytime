@@ -54,7 +54,6 @@ export interface CatalogQueryParams {
     courseIdentifiers?:
       | { subject: string; courseNumber: string }[]
       | null;
-    orBreadthsWithCourseIdentifiers?: boolean | null;
     online?: boolean | null;
   } | null;
   sortBy?: string | null;
@@ -364,40 +363,39 @@ const applyInMemoryFilters = (
       return false;
     }
 
-    // Breadth requirements / specific course identifiers
+    // Requirements: OR across breadths, university requirements, and course lists
     const breadths = filters.breadths ?? [];
+    const universityRequirements = filters.universityRequirements ?? [];
     const courseIdentifiers = filters.courseIdentifiers ?? [];
-    const matchesBreadth =
-      breadths.length === 0 ||
-      Boolean(item.breadthRequirements?.some((b) => breadths.includes(b)));
-    const matchesCourse =
-      courseIdentifiers.length === 0 ||
-      courseIdentifiers.some(
-        (identifier) =>
-          identifier.subject === item.subject &&
-          identifier.courseNumber === item.courseNumber
-      );
+    const requirementClauses: boolean[] = [];
 
-    if (filters.orBreadthsWithCourseIdentifiers && breadths.length > 0 && courseIdentifiers.length > 0) {
-      if (!matchesBreadth && !matchesCourse) {
-        return false;
-      }
-    } else {
-      if (breadths.length > 0 && !matchesBreadth) {
-        return false;
-      }
-      if (courseIdentifiers.length > 0 && !matchesCourse) {
-        return false;
-      }
+    if (breadths.length > 0) {
+      requirementClauses.push(
+        Boolean(item.breadthRequirements?.some((b) => breadths.includes(b)))
+      );
+    }
+    if (universityRequirements.length > 0) {
+      requirementClauses.push(
+        Boolean(
+          item.universityRequirements?.some((u) =>
+            universityRequirements.includes(u)
+          )
+        )
+      );
+    }
+    if (courseIdentifiers.length > 0) {
+      requirementClauses.push(
+        courseIdentifiers.some(
+          (identifier) =>
+            identifier.subject === item.subject &&
+            identifier.courseNumber === item.courseNumber
+        )
+      );
     }
 
-    // University requirements
     if (
-      filters.universityRequirements &&
-      filters.universityRequirements.length > 0 &&
-      !item.universityRequirements?.some((u) =>
-        filters.universityRequirements!.includes(u)
-      )
+      requirementClauses.length > 0 &&
+      !requirementClauses.some(Boolean)
     ) {
       return false;
     }
@@ -535,45 +533,33 @@ const buildFilterQuery = (
     query.gradingBasis = { $in: filters.gradingFilters };
   }
 
-  // Breadth requirements / specific course identifiers
+  // Requirements: OR across breadths, university requirements, and course lists
   const breadths = filters.breadths ?? [];
+  const universityRequirements = filters.universityRequirements ?? [];
   const courseIdentifiers = filters.courseIdentifiers ?? [];
-  const courseIdentifierCondition =
-    courseIdentifiers.length > 0
-      ? {
-          $or: courseIdentifiers.map(({ subject, courseNumber }) => ({
-            subject,
-            courseNumber,
-          })),
-        }
-      : null;
+  const requirementConditions: CatalogFilterCondition[] = [];
 
-  if (
-    filters.orBreadthsWithCourseIdentifiers &&
-    breadths.length > 0 &&
-    courseIdentifierCondition
-  ) {
-    appendAndCondition(query, {
-      $or: [
-        { breadthRequirements: { $in: breadths } },
-        courseIdentifierCondition,
-      ],
+  if (breadths.length > 0) {
+    requirementConditions.push({ breadthRequirements: { $in: breadths } });
+  }
+  if (universityRequirements.length > 0) {
+    requirementConditions.push({
+      universityRequirements: { $in: universityRequirements },
     });
-  } else {
-    if (breadths.length > 0) {
-      query.breadthRequirements = { $in: breadths };
-    }
-    if (courseIdentifierCondition) {
-      appendAndCondition(query, courseIdentifierCondition);
-    }
+  }
+  if (courseIdentifiers.length > 0) {
+    requirementConditions.push({
+      $or: courseIdentifiers.map(({ subject, courseNumber }) => ({
+        subject,
+        courseNumber,
+      })),
+    });
   }
 
-  // University requirements
-  if (
-    filters.universityRequirements &&
-    filters.universityRequirements.length > 0
-  ) {
-    query.universityRequirements = { $in: filters.universityRequirements };
+  if (requirementConditions.length === 1) {
+    Object.assign(query, requirementConditions[0]);
+  } else if (requirementConditions.length > 1) {
+    appendAndCondition(query, { $or: requirementConditions });
   }
 
   // Online filter

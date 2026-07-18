@@ -41,9 +41,6 @@ export const catalogTypeDef = gql`
     breadths: [String!]
     universityRequirements: [String!]
     courseIdentifiers: [CatalogCourseIdentifierInput!]
-    # When true with both breadths and courseIdentifiers, match either (OR).
-    # Default / false keeps the usual AND between those filters.
-    orBreadthsWithCourseIdentifiers: Boolean
     online: Boolean
   }
 

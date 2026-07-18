@@ -310,34 +310,28 @@ export const getFilteredClasses = (
         }
       }
 
-      // Filter by breadth requirements
-      if (currentBreadths.length > 0) {
+      // Filter by requirements (OR across breadths and university requirements)
+      if (
+        currentBreadths.length > 0 ||
+        currentUniversityRequirements.length > 0
+      ) {
         const classBreadths = getBreadthRequirements(
           _class.primarySection?.sectionAttributes ?? []
         );
-        const matchesAnyBreadth = currentBreadths.some((breadth) =>
-          classBreadths.includes(breadth)
-        );
-
-        if (!matchesAnyBreadth) {
-          acc.excludedClasses.push(_class);
-
-          return acc;
-        }
-      }
-
-      // Filter by university requirements
-      if (currentUniversityRequirements.length > 0) {
-        const classRequirements = getUniversityRequirements(
+        const classUniversityRequirements = getUniversityRequirements(
           _class.requirementDesignation
         );
-        const matchesAnyRequirement = currentUniversityRequirements.some(
-          (req) => classRequirements.includes(req)
-        );
+        const matchesBreadth =
+          currentBreadths.length > 0 &&
+          currentBreadths.some((breadth) => classBreadths.includes(breadth));
+        const matchesUniversity =
+          currentUniversityRequirements.length > 0 &&
+          currentUniversityRequirements.some((req) =>
+            classUniversityRequirements.includes(req)
+          );
 
-        if (!matchesAnyRequirement) {
+        if (!matchesBreadth && !matchesUniversity) {
           acc.excludedClasses.push(_class);
-
           return acc;
         }
       }
