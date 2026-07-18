@@ -124,7 +124,7 @@
  * - `multi`: Enable multi-select mode (default: false)
  * - `checkboxMulti`: Show checkboxes in multi-select mode (default: false, only works in non-searchable mode)
  * - `searchable`: Enable search functionality (default: false)
- * - `tabs`: Tab configuration for organizing options (forces searchable mode)
+ * - `tabs`: Tab configuration for organizing options
  * - `clearable`: Show clear button to reset selection (default: false)
  * - `disabled`: Disable the select (default: false)
  * - `loading`: Show loading state with "Loading content" text and disable interaction (default: false)
@@ -140,7 +140,7 @@
  * - `onTabChange`: Callback when tab changes
  *
  * @notes
- * - Tabs automatically enable searchable mode
+ * - Tabs use the popover layout; set `searchable` to also show a search input
  * - checkboxMulti only works in non-searchable mode (DropdownMenu variant)
  * - Colors are applied to both badges and dropdown items
  * - Options can include meta text for additional information (e.g., counts)
@@ -267,8 +267,8 @@ export function Select<T>({
   const contentZIndex = Math.max(1010, stack + 1);
   const { triggerRef, triggerWidth } = useMatchTriggerWidth<HTMLDivElement>();
 
-  // Tabs force searchable mode
-  const isSearchable = searchable || Boolean(tabs?.length);
+  // Tabs use the popover layout (same as searchable); search input is optional.
+  const usesPopoverMenu = searchable || Boolean(tabs?.length);
 
   useImperativeHandle(ref, () => ({
     focus: () => {
@@ -281,17 +281,17 @@ export function Select<T>({
 
   // Notify parent when search changes
   useEffect(() => {
-    if (isSearchable) {
+    if (searchable) {
       onSearchChange?.(searchValue);
     }
-  }, [searchValue, onSearchChange, isSearchable]);
+  }, [searchValue, onSearchChange, searchable]);
 
   // Clear search when opening/closing
   useEffect(() => {
-    if (!open && isSearchable) {
+    if (!open && searchable) {
       setSearchValue("");
     }
-  }, [open, isSearchable]);
+  }, [open, searchable]);
 
   // Manage tab state
   useEffect(() => {
@@ -539,8 +539,8 @@ export function Select<T>({
     });
   };
 
-  // SEARCHABLE MODE: Use Popover + Command (cmdk)
-  if (isSearchable) {
+  // POPOVER MODE: Use Popover + Command (cmdk) for searchable and/or tabbed selects
+  if (usesPopoverMenu) {
     return (
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild disabled={effectiveDisabled}>
@@ -571,19 +571,21 @@ export function Select<T>({
               collisionPadding={8}
             >
               <Command shouldFilter={false}>
-                <div className={styles.searchInputWrapper}>
-                  <Search
-                    className={styles.searchIcon}
-                    width={16}
-                    height={16}
-                  />
-                  <Command.Input
-                    placeholder={searchPlaceholder}
-                    value={searchValue}
-                    onValueChange={setSearchValue}
-                    className={styles.searchInput}
-                  />
-                </div>
+                {searchable ? (
+                  <div className={styles.searchInputWrapper}>
+                    <Search
+                      className={styles.searchIcon}
+                      width={16}
+                      height={16}
+                    />
+                    <Command.Input
+                      placeholder={searchPlaceholder}
+                      value={searchValue}
+                      onValueChange={setSearchValue}
+                      className={styles.searchInput}
+                    />
+                  </div>
+                ) : null}
                 {tabs?.length ? (
                   <div
                     className={classNames(

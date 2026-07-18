@@ -54,6 +54,7 @@ export interface CatalogQueryParams {
     courseIdentifiers?:
       | { subject: string; courseNumber: string }[]
       | null;
+    orBreadthsWithCourseIdentifiers?: boolean | null;
     online?: boolean | null;
   } | null;
   sortBy?: string | null;
@@ -363,13 +364,31 @@ const applyInMemoryFilters = (
       return false;
     }
 
-    // Breadth requirements
-    if (
-      filters.breadths &&
-      filters.breadths.length > 0 &&
-      !item.breadthRequirements?.some((b) => filters.breadths!.includes(b))
-    ) {
-      return false;
+    // Breadth requirements / specific course identifiers
+    const breadths = filters.breadths ?? [];
+    const courseIdentifiers = filters.courseIdentifiers ?? [];
+    const matchesBreadth =
+      breadths.length === 0 ||
+      Boolean(item.breadthRequirements?.some((b) => breadths.includes(b)));
+    const matchesCourse =
+      courseIdentifiers.length === 0 ||
+      courseIdentifiers.some(
+        (identifier) =>
+          identifier.subject === item.subject &&
+          identifier.courseNumber === item.courseNumber
+      );
+
+    if (filters.orBreadthsWithCourseIdentifiers && breadths.length > 0 && courseIdentifiers.length > 0) {
+      if (!matchesBreadth && !matchesCourse) {
+        return false;
+      }
+    } else {
+      if (breadths.length > 0 && !matchesBreadth) {
+        return false;
+      }
+      if (courseIdentifiers.length > 0 && !matchesCourse) {
+        return false;
+      }
     }
 
     // University requirements
@@ -378,19 +397,6 @@ const applyInMemoryFilters = (
       filters.universityRequirements.length > 0 &&
       !item.universityRequirements?.some((u) =>
         filters.universityRequirements!.includes(u)
-      )
-    ) {
-      return false;
-    }
-
-    // Specific course identifiers (e.g. EECS Ethics list)
-    if (
-      filters.courseIdentifiers &&
-      filters.courseIdentifiers.length > 0 &&
-      !filters.courseIdentifiers.some(
-        (identifier) =>
-          identifier.subject === item.subject &&
-          identifier.courseNumber === item.courseNumber
       )
     ) {
       return false;
@@ -529,9 +535,37 @@ const buildFilterQuery = (
     query.gradingBasis = { $in: filters.gradingFilters };
   }
 
-  // Breadth requirements
-  if (filters.breadths && filters.breadths.length > 0) {
-    query.breadthRequirements = { $in: filters.breadths };
+  // Breadth requirements / specific course identifiers
+  const breadths = filters.breadths ?? [];
+  const courseIdentifiers = filters.courseIdentifiers ?? [];
+  const courseIdentifierCondition =
+    courseIdentifiers.length > 0
+      ? {
+          $or: courseIdentifiers.map(({ subject, courseNumber }) => ({
+            subject,
+            courseNumber,
+          })),
+        }
+      : null;
+
+  if (
+    filters.orBreadthsWithCourseIdentifiers &&
+    breadths.length > 0 &&
+    courseIdentifierCondition
+  ) {
+    appendAndCondition(query, {
+      $or: [
+        { breadthRequirements: { $in: breadths } },
+        courseIdentifierCondition,
+      ],
+    });
+  } else {
+    if (breadths.length > 0) {
+      query.breadthRequirements = { $in: breadths };
+    }
+    if (courseIdentifierCondition) {
+      appendAndCondition(query, courseIdentifierCondition);
+    }
   }
 
   // University requirements
@@ -540,16 +574,6 @@ const buildFilterQuery = (
     filters.universityRequirements.length > 0
   ) {
     query.universityRequirements = { $in: filters.universityRequirements };
-  }
-
-  // Specific course identifiers (e.g. EECS Ethics list)
-  if (filters.courseIdentifiers && filters.courseIdentifiers.length > 0) {
-    appendAndCondition(query, {
-      $or: filters.courseIdentifiers.map(({ subject, courseNumber }) => ({
-        subject,
-        courseNumber,
-      })),
-    });
   }
 
   // Online filter

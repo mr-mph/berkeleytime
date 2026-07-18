@@ -131,7 +131,7 @@ export interface CatalogFilterState {
   timeRange: TimeRange;
   breadths: string[];
   universityRequirements: string[];
-  eecsRequirement: EecsRequirementValue | null;
+  eecsRequirements: EecsRequirementValue[];
   gradingFilters: GradingFilter[];
   sortBy: SortBy;
   reverse: boolean;
@@ -151,7 +151,7 @@ export interface CatalogFilterUpdaters {
   updateTimeRange: Dispatch<TimeRange>;
   updateBreadths: Dispatch<string[]>;
   updateUniversityRequirements: Dispatch<string[]>;
-  updateEecsRequirement: Dispatch<EecsRequirementValue | null>;
+  updateEecsRequirements: Dispatch<EecsRequirementValue[]>;
   updateGradingFilters: Dispatch<GradingFilter[]>;
   updateSortBy: Dispatch<SortBy>;
   updateEnrollmentFilter: Dispatch<EnrollmentFilter | null>;
@@ -178,8 +178,9 @@ export default function useCatalogFilters({
   const [localBreadths, setLocalBreadths] = useState<string[]>([]);
   const [localUniversityRequirements, setLocalUniversityRequirements] =
     useState<string[]>([]);
-  const [localEecsRequirement, setLocalEecsRequirement] =
-    useState<EecsRequirementValue | null>(null);
+  const [localEecsRequirements, setLocalEecsRequirements] = useState<
+    EecsRequirementValue[]
+  >([]);
   const [localGradingFilters, setLocalGradingFilters] = useState<
     GradingFilter[]
   >([]);
@@ -255,13 +256,15 @@ export default function useCatalogFilters({
     [searchParams, localUniversityRequirements, persistent]
   );
 
-  const eecsRequirement = useMemo((): EecsRequirementValue | null => {
-    if (persistent) {
-      const param = searchParams.get("eecsRequirement");
-      return isEecsRequirementValue(param) ? param : null;
-    }
-    return localEecsRequirement;
-  }, [searchParams, localEecsRequirement, persistent]);
+  const eecsRequirements = useMemo((): EecsRequirementValue[] => {
+    if (!persistent) return localEecsRequirements;
+
+    const fromList =
+      searchParams.get("eecsRequirements")?.split(",").filter(Boolean) ?? [];
+    const legacy = searchParams.get("eecsRequirement");
+    const raw = fromList.length > 0 ? fromList : legacy ? [legacy] : [];
+    return raw.filter(isEecsRequirementValue);
+  }, [searchParams, localEecsRequirements, persistent]);
 
   const gradingFilters = useMemo(
     () =>
@@ -344,14 +347,29 @@ export default function useCatalogFilters({
       filters.universityRequirements = universityRequirements;
     }
 
-    if (
-      eecsRequirement === EECS_REQUIREMENT_VALUES.HUMANITIES_SOCIAL_SCIENCES
-    ) {
-      filters.breadths = [...EECS_HUMANITIES_SOCIAL_SCIENCES_BREADTHS];
-    } else if (eecsRequirement === EECS_REQUIREMENT_VALUES.ETHICS) {
+    const hasEecsHss = eecsRequirements.includes(
+      EECS_REQUIREMENT_VALUES.HUMANITIES_SOCIAL_SCIENCES
+    );
+    const hasEecsEthics = eecsRequirements.includes(
+      EECS_REQUIREMENT_VALUES.ETHICS
+    );
+
+    if (hasEecsHss) {
+      const eecsBreadths = [...EECS_HUMANITIES_SOCIAL_SCIENCES_BREADTHS];
+      filters.breadths =
+        breadths.length > 0
+          ? eecsBreadths.filter((breadth) => breadths.includes(breadth))
+          : eecsBreadths;
+    }
+
+    if (hasEecsEthics) {
       filters.courseIdentifiers = EECS_ETHICS_COURSES.map(
         ({ subject, courseNumber }) => ({ subject, courseNumber })
       );
+    }
+
+    if (hasEecsHss && hasEecsEthics) {
+      filters.orBreadthsWithCourseIdentifiers = true;
     }
 
     if (online) filters.online = true;
@@ -366,7 +384,7 @@ export default function useCatalogFilters({
     gradingFilters,
     breadths,
     universityRequirements,
-    eecsRequirement,
+    eecsRequirements,
     online,
   ]);
 
@@ -379,7 +397,7 @@ export default function useCatalogFilters({
     timeRange[1] !== null ||
     breadths.length > 0 ||
     universityRequirements.length > 0 ||
-    eecsRequirement !== null ||
+    eecsRequirements.length > 0 ||
     gradingFilters.length > 0 ||
     enrollmentFilter !== null ||
     online ||
@@ -474,7 +492,7 @@ export default function useCatalogFilters({
     timeRange,
     breadths,
     universityRequirements,
-    eecsRequirement,
+    eecsRequirements,
     gradingFilters,
     sortBy,
     reverse: localReverse,
@@ -496,14 +514,18 @@ export default function useCatalogFilters({
         setLocalUniversityRequirements,
         reqs
       ),
-    updateEecsRequirement: (value) => {
+    updateEecsRequirements: (reqs) => {
       if (persistent) {
-        if (value === null) searchParams.delete("eecsRequirement");
-        else searchParams.set("eecsRequirement", value);
+        searchParams.delete("eecsRequirement");
+        if (reqs.length > 0) {
+          searchParams.set("eecsRequirements", reqs.join(","));
+        } else {
+          searchParams.delete("eecsRequirements");
+        }
         setSearchParams(searchParams);
         return;
       }
-      setLocalEecsRequirement(value);
+      setLocalEecsRequirements(reqs);
     },
     updateGradingFilters: (filters) =>
       updateArray("gradingBases", setLocalGradingFilters, filters),

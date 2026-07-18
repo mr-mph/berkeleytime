@@ -58,8 +58,8 @@ export default function Filters() {
     updateBreadths,
     universityRequirements,
     updateUniversityRequirements,
-    eecsRequirement,
-    updateEecsRequirement,
+    eecsRequirements,
+    updateEecsRequirements,
     gradingFilters,
     updateGradingFilters,
     enrollmentFilter,
@@ -174,32 +174,19 @@ export default function Filters() {
   const requirementSelectTabs =
     requirementTabs.length > 0 ? requirementTabs : undefined;
 
-  const selectedRequirement = useMemo<RequirementSelection | null>(() => {
-    if (eecsRequirement) {
-      return { type: "eecs", value: eecsRequirement };
+  const selectedRequirements = useMemo<RequirementSelection[]>(() => {
+    const selected: RequirementSelection[] = [];
+    for (const breadth of breadths) {
+      selected.push({ type: "breadth", value: breadth });
     }
-    if (breadths.length > 0) {
-      return { type: "breadth", value: breadths[0] };
+    for (const requirement of universityRequirements) {
+      selected.push({ type: "university", value: requirement });
     }
-    if (universityRequirements.length > 0) {
-      return { type: "university", value: universityRequirements[0] };
+    for (const requirement of eecsRequirements) {
+      selected.push({ type: "eecs", value: requirement });
     }
-    return null;
-  }, [breadths, universityRequirements, eecsRequirement]);
-
-  useEffect(() => {
-    if (selectedRequirement?.type === "eecs") {
-      setActiveRequirementTab(REQUIREMENT_TABS.EECS);
-      return;
-    }
-    if (selectedRequirement?.type === "breadth") {
-      setActiveRequirementTab(REQUIREMENT_TABS.LS);
-      return;
-    }
-    if (selectedRequirement?.type === "university") {
-      setActiveRequirementTab(REQUIREMENT_TABS.UNIVERSITY);
-    }
-  }, [selectedRequirement]);
+    return selected;
+  }, [breadths, universityRequirements, eecsRequirements]);
 
   useEffect(() => {
     if (!requirementSelectTabs?.length) return;
@@ -245,7 +232,7 @@ export default function Filters() {
   const clearRequirementFilters = () => {
     updateBreadths([]);
     updateUniversityRequirements([]);
-    updateEecsRequirement(null);
+    updateEecsRequirements([]);
   };
 
   const handleClearFilters = () => {
@@ -354,9 +341,9 @@ export default function Filters() {
         <div className={styles.formControl}>
           <p className={styles.label}>Requirements</p>
           <Select<RequirementSelection>
-            searchable
+            multi
             clearable
-            value={selectedRequirement}
+            value={selectedRequirements}
             placeholder="Filter by requirements"
             tabs={requirementSelectTabs}
             defaultTab={requirementSelectTabs?.[0]?.value}
@@ -365,28 +352,45 @@ export default function Filters() {
               setActiveRequirementTab(tabValue);
             }}
             onChange={(value) => {
-              if (value === null) {
+              if (value === null || (Array.isArray(value) && value.length === 0)) {
                 clearRequirementFilters();
                 return;
               }
-              if (Array.isArray(value)) return;
-              if (value.type === "breadth") {
-                updateBreadths([value.value]);
-                updateUniversityRequirements([]);
-                updateEecsRequirement(null);
-                return;
-              }
-              if (value.type === "university") {
-                updateUniversityRequirements([value.value]);
-                updateBreadths([]);
-                updateEecsRequirement(null);
-                return;
-              }
-              updateEecsRequirement(value.value);
-              updateBreadths([]);
-              updateUniversityRequirements([]);
+              if (!Array.isArray(value)) return;
+
+              updateBreadths(
+                value
+                  .filter(
+                    (
+                      selection
+                    ): selection is Extract<RequirementSelection, { type: "breadth" }> =>
+                      selection.type === "breadth"
+                  )
+                  .map((selection) => selection.value)
+              );
+              updateUniversityRequirements(
+                value
+                  .filter(
+                    (
+                      selection
+                    ): selection is Extract<
+                      RequirementSelection,
+                      { type: "university" }
+                    > => selection.type === "university"
+                  )
+                  .map((selection) => selection.value)
+              );
+
+              const nextEecs = value
+                .filter(
+                  (
+                    selection
+                  ): selection is Extract<RequirementSelection, { type: "eecs" }> =>
+                    selection.type === "eecs"
+                )
+                .map((selection) => selection.value);
+              updateEecsRequirements(nextEecs);
             }}
-            searchPlaceholder="Search requirements..."
             emptyMessage="No requirements found."
             contentClassName={styles.requirementsSelectContent}
             tabsWrapperClassName={styles.requirementsTabs}
