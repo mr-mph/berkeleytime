@@ -63,6 +63,9 @@ export const getSecondarySections = async (
     courseNumber,
     associatedSectionIds: { $in: [sectionId] },
     primary: false, // filter out lectures
+    // Match classes.berkeley.edu: omit SIS shells not printed in the schedule
+    // (e.g. Data 8 labs 101–147 while only 999L is offered publicly).
+    printInScheduleOfClasses: true,
   }).lean();
 
   if (sections.length === 0) {
@@ -76,6 +79,7 @@ export const getSecondarySections = async (
       courseNumber,
       associatedClass: parseInt(number),
       primary: false, // filter out lectures
+      printInScheduleOfClasses: true,
     }).lean();
     if (sections2.length > 0) {
       sections.push(...sections2);
