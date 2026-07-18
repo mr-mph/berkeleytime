@@ -140,23 +140,28 @@ export const getDistribution = (
   distributions: GradeCounts[],
   weights?: number[]
 ) => {
-  const counts = sumGradeCounts(distributions, weights);
+  // Percentages carry the term-decay weighting when weights are provided;
+  // counts always report the true number of grades given.
+  const weighted = sumGradeCounts(distributions, weights);
+  const raw = weights ? sumGradeCounts(distributions) : weighted;
 
-  const total = Object.values(counts).reduce((acc, count) => acc + count, 0);
+  const total = Object.values(weighted).reduce((acc, count) => acc + count, 0);
 
-  return Object.entries(counts).map(
+  return Object.entries(weighted).map(
     ([field, count]) =>
       ({
         letter: letters[field],
         percentage: total > 0 && count > 0 ? count / total : 0,
-        count: Math.round(count),
+        count: raw[field as keyof GradeCounts],
       }) as Grade
   );
 };
 
+// Average and P/NP stats weigh grades by percentage rather than count, so
+// they respect the term-decay weighting when present (counts are always raw).
 export const getAverageGrade = (distribution: Grade[]) => {
-  const total = distribution.reduce((acc, { letter, count }) => {
-    if (letter in points) return acc + count;
+  const total = distribution.reduce((acc, { letter, percentage }) => {
+    if (letter in points) return acc + percentage;
 
     // Ignore letters not included in GPA
     return acc;
@@ -165,8 +170,8 @@ export const getAverageGrade = (distribution: Grade[]) => {
   // For distributions without a GPA, return null
   if (total === 0) return null;
 
-  const weightedTotal = distribution.reduce((acc, { letter, count }) => {
-    if (letter in points) return points[letter] * count + acc;
+  const weightedTotal = distribution.reduce((acc, { letter, percentage }) => {
+    if (letter in points) return points[letter] * percentage + acc;
 
     return acc;
   }, 0);
@@ -177,11 +182,12 @@ export const getAverageGrade = (distribution: Grade[]) => {
 export const getPnpPercentage = (distribution: Grade[]) => {
   // Calculate (P + S) / (P + NP + S + U)
   const pnpGrades = distribution.reduce(
-    (acc, { letter, count }) => {
-      if (letter === Letter.Pass) acc.pass += count;
-      else if (letter === Letter.Satisfactory) acc.satisfactory += count;
-      else if (letter === Letter.NotPass) acc.notPass += count;
-      else if (letter === Letter.Unsatisfactory) acc.unsatisfactory += count;
+    (acc, { letter, percentage }) => {
+      if (letter === Letter.Pass) acc.pass += percentage;
+      else if (letter === Letter.Satisfactory) acc.satisfactory += percentage;
+      else if (letter === Letter.NotPass) acc.notPass += percentage;
+      else if (letter === Letter.Unsatisfactory)
+        acc.unsatisfactory += percentage;
       return acc;
     },
     { pass: 0, satisfactory: 0, notPass: 0, unsatisfactory: 0 }

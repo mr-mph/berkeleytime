@@ -23,6 +23,9 @@ const EMA_ALPHA = 0.1;
  * Weight of the nth semester back: (1 - alpha)^n
  *   alpha = 0   → simple sum (backward compatible)
  *   alpha = 0.1 → slow decay (default)
+ *
+ * The decay applies to percentages, average, and pnpPercentage only —
+ * per-grade counts are always raw student totals.
  */
 export const aggregateGradeDistributions = (
   distributions: IGradeDistributionItem[],

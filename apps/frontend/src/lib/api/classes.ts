@@ -448,6 +448,7 @@ export const GET_CLASS_GRADES = gql`
           average
           distribution {
             letter
+            percentage
             count
           }
         }

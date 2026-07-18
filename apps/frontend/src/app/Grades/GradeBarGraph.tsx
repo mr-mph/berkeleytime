@@ -161,13 +161,15 @@ export default function GradeBarGraph({
 
     const chartConfig = createChartConfig(dataKeys, { labels, colors });
 
-    // Pre-compute totals for each output
+    // Pre-compute each output's total displayed share. Bars renormalize the
+    // API's recency-weighted percentages over the displayed grades; raw
+    // counts are kept separately for tooltips.
     const totals = outputs.map((output) => {
       const dist = output.data?.distribution;
       if (!dist) return 0;
       return displayedGrades.reduce((acc, letter) => {
         const grade = dist.find((g) => g.letter === letter);
-        return acc + (grade?.count ?? 0);
+        return acc + (grade?.percentage ?? 0);
       }, 0);
     });
 
@@ -181,7 +183,19 @@ export default function GradeBarGraph({
           return;
         }
         const grade = dist.find((g) => g.letter === letter);
-        row[dataKeys[i]] = ((grade?.count ?? 0) / totals[i]) * 100;
+        row[dataKeys[i]] = ((grade?.percentage ?? 0) / totals[i]) * 100;
+      });
+      return row;
+    });
+
+    // Raw student counts for each letter grade per course
+    const counts = displayedGrades.map((letter) => {
+      const row: Record<string, number> = {};
+      outputs.forEach((output, i) => {
+        const grade = output.data?.distribution?.find(
+          (g) => g.letter === letter
+        );
+        row[dataKeys[i]] = grade?.count ?? 0;
       });
       return row;
     });
@@ -203,6 +217,7 @@ export default function GradeBarGraph({
       const row: Record<string, number | string> = { letter };
       dataKeys.forEach((key) => {
         row[key] = percentages[i][key];
+        row[`${key}_count`] = counts[i][key];
         row[`${key}_pctlLo`] = cumulative[i][key];
         row[`${key}_pctlHi`] = cumulative[i][key] + percentages[i][key];
       });
@@ -420,6 +435,7 @@ export default function GradeBarGraph({
                           {payload.map((item) => {
                             const key = item.dataKey as string;
                             const row = item.payload;
+                            const count = row[`${key}_count`] as number;
                             const pctlLo = row[`${key}_pctlLo`] as number;
                             const pctlHi = row[`${key}_pctlHi`] as number;
                             return (
@@ -437,12 +453,18 @@ export default function GradeBarGraph({
                                   />
                                   {chartConfig[key]?.label ?? item.name}
                                 </span>
-                                <span className={styles.tooltipItemValue}>
-                                  {formatters.percent(item.value, 1)}
-                                </span>
-                                <span className={styles.tooltipItemValue}>
-                                  {ordinal(Math.round(pctlLo))}–
-                                  {ordinal(Math.round(pctlHi))} pctile
+                                <span className={styles.tooltipItemStats}>
+                                  <span className={styles.tooltipItemValue}>
+                                    {formatters.percent(item.value, 1)}
+                                  </span>
+                                  <span className={styles.tooltipItemValue}>
+                                    {ordinal(Math.round(pctlLo))}–
+                                    {ordinal(Math.round(pctlHi))} pctile
+                                  </span>
+                                  <span className={styles.tooltipItemValue}>
+                                    {count.toLocaleString()}{" "}
+                                    {count === 1 ? "grade" : "grades"}
+                                  </span>
                                 </span>
                               </div>
                             );
