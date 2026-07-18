@@ -71,11 +71,16 @@ export default function Sections() {
 
   const sections = data?.sections ?? [];
 
-  // Group sections by component type
+  // Group sections by component type. Section 999 / 999L / etc. (often a
+  // TBA DIS/LAB) sorts to the top within its group.
   const groups = useMemo(() => {
-    const sortedSections = sections.toSorted((a, b) =>
-      a.number.localeCompare(b.number)
-    );
+    const is999Section = (number: string) => number.startsWith("999");
+    const sortedSections = sections.toSorted((a, b) => {
+      const aIs999 = is999Section(a.number);
+      const bIs999 = is999Section(b.number);
+      if (aIs999 !== bIs999) return aIs999 ? -1 : 1;
+      return a.number.localeCompare(b.number);
+    });
 
     return Object.groupBy(sortedSections, (section) => section.component);
   }, [sections]);
