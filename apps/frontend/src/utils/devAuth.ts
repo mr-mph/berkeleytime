@@ -36,7 +36,10 @@ export const clearStoredDevUserId = (): void => {
 };
 
 export const isDevAuthCollapsed = (): boolean => {
-  return localStorage.getItem(DEV_AUTH_COLLAPSED_KEY) === "true";
+  const value = localStorage.getItem(DEV_AUTH_COLLAPSED_KEY);
+  // Default to collapsed when unset.
+  if (value === null) return true;
+  return value === "true";
 };
 
 export const setDevAuthCollapsed = (collapsed: boolean): void => {
