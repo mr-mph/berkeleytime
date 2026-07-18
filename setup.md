@@ -1,71 +1,146 @@
 # Setting up Berkeleytime
 
-## For Local Developers
+> Full details live in the docs: [Local Development](apps/docs/src/getting-started/local-development.md)
+> (also at https://docs.berkeleytime.com/getting-started/local-development.html when published).
 
-This project uses [Docker](https://www.docker.com) and [Docker Compose](https://docs.docker.com/compose/).
-If you don't know what containers are, read this [article](https://medium.freecodecamp.org/demystifying-containers-101-a-deep-dive-into-container-technology-for-beginners-d7b60d8511c1).
-Docker is a container platform and Docker Compose is a a tool for defining and running multi-container 
-Docker applications. Make sure you have both install on your computer before you start. Docker Compose
-comes with Docker in most cases (such as MacOS).
+This repo is a **Turbo monorepo**. Local development runs via **Docker Compose**. The stack is **Node.js** (Express + Apollo GraphQL backend, Vite/React frontend), **MongoDB**, **Redis**, and **nginx**.
 
-### Seeding the Local Database
-To run Berkeleytime, make sure this repo is cloned. From the top level, first download the development
-Postgres data:
-1. `make postgres` - start up the postgres container
-2. `curl -O https://storage.googleapis.com/berkeleytime/public/bt_seed.sql.gz` - download the database as a GZip file
-3. `gzip -d bt_seed.sql.gz` - unzip this file
-4. `cat bt_seed.sql | docker exec -i bt_postgres psql -U bt -d bt_main` - see Postgres container with the data.
+## Prerequisites
 
-Before starting the server, make sure the `DATABASE_URL` entry in your `.env.dev` is `postgres://bt:bt@postgres:5432/bt_main` so that the backend connects to the local DB.
+- [Git](https://git-scm.com/install/)
+- [Docker Desktop](https://www.docker.com/) (Compose v2 included)
+- [nvm](https://github.com/nvm-sh/nvm) (or another Node version manager)
+- [pre-commit](https://pre-commit.com/#install) (optional but recommended; `brew install pre-commit` on macOS)
 
-### Starting the local server
-To boot the services, run `make up`. This will boot 6 containers (redis, postgres, nginx, Django, Node.js). Wait for both
-Postgres and Django to be running before you proceed. Django will say 
+Supported bootstrap platforms: **macOS** and **Linux/WSL**.
 
-    Starting development server at http://0.0.0.0:8000/
-    
-And Postgres will say
+## Quickstart
 
-    LOG:  database system is ready to accept connections
-    
-And the Node server will stop spitting errors.
-    
-To remove the cluster, **DO NOT USE CONTROL-C** or anything to stop or terminate the docker compose
-process. Instead use `make down` to safely kill the cluster.
+From the repo root:
 
-If you modify the source code, you will not have to do anything to restart the cluster or services.
-Django will automatically detect a change and restart itself. 
+```sh
+bash apps/docs/src/getting-started/bootstrap-local.sh
+```
 
-## For Maintainers
+Optional flags:
 
-The Makefile provides some descriptions of how the commands work together. `make base`, `make prod`, 
-and `make db` are used to build the images and push them to Dockerhub. The local dev image uses the base
-image and them attaches the local copy of the source code as a volume. The prod image packages the local
-copy of the code into the image itself. 
+```sh
+bash apps/docs/src/getting-started/bootstrap-local.sh --no-seed-db   # skip Mongo restore
+bash apps/docs/src/getting-started/bootstrap-local.sh --no-docker    # deps + codegen only
+```
 
-The database image is the most unique. `make db` produces an image that is used solely to set up
-a database to load the dumped SQL data. This SQL data is dumped from the production database using
-`pg_dump` and should be saved as `build/bt_main.sql`. This sql dump is then used by the db build container to
-be loaded into postgres and stored as a `tar` file of the postgres directory.
+When it finishes, open **http://localhost:3000**.
 
-Once `pg_dump` completes, run `make db`. This commands builds an image and copies `bt_main.sql` into it.
-It also pushes the image, but this step is not necessary. The next goal is to run the image, which will
-automatically run a script `init_db.sh` that loads `bt_main.sql`. After you see that the db is ready
-to accept connections, the container is now ready and will be a completed db. 
-However to save the db so that other users do not have to load the dump every time they
-boot a cluster, we will save a copy of the data folder, which backs Postgres.
+## Manual setup
 
-The entire list of commands is
+If you prefer not to use the bootstrap script:
 
-    pg_dump -h <public-ip-of-prod-db> -U bt -d bt_main > build/bt_main.sql
-    make db
-    docker run berkeleytime/db
-    
-    # In another terminal window, without closing the first window
-    docker cp XXXX:/var/lib/postgresql/data build/postgres-data
-    tar czf postgres-data.tar.gz build/postgres-data
+```sh
+git pull
+git switch main
 
-where `XXXX` is the container ID resulting from the previous `docker run` command. The `tar` command
-will tar up the data directory. Then you can upload it to the same Google [bucket](https://console.cloud.google.com/storage/browser/berkeleytime-dev-db?project=berkeleytime-218606). 
-The user will then use `make init` to download and untar this directory and save it into `build/` 
-so that Docker Compose can use it as a volume for Postgres.
+nvm install --lts
+pre-commit install   # optional
+
+cp .env.template .env   # will not overwrite an existing .env
+
+npm install
+npx turbo run generate
+
+docker compose up -d
+```
+
+App URL: **http://localhost:3000** (nginx proxies frontend + `/api`).
+
+Stop the stack with:
+
+```sh
+docker compose down
+```
+
+Source is bind-mounted into the containers, so most backend/frontend edits hot-reload. After GraphQL schema changes, regenerate types:
+
+```sh
+npx turbo run generate
+```
+
+After adding npm packages that containers don’t pick up:
+
+```sh
+docker compose down
+docker compose up --build -d
+```
+
+## What runs by default
+
+`docker compose up -d` starts the **core stack**:
+
+| Service     | Role                                      |
+| ----------- | ----------------------------------------- |
+| `nginx`     | Reverse proxy on port `3000`              |
+| `frontend`  | Vite React app                            |
+| `backend`   | Express + Apollo GraphQL                  |
+| `datapuller`| Local scheduled SIS / catalog pullers     |
+| `mongodb`   | MongoDB Atlas Local (data on port `3008`) |
+| `redis`     | Cache / sessions (port `3004`)            |
+
+Opt-in profiles (examples):
+
+```sh
+docker compose --profile staff up -d              # staff dashboard → :3002
+docker compose --profile ag --profile staff up -d
+docker compose --profile docs up -d               # docs / storybook
+docker compose --profile semantic-search up -d
+docker compose --profile dev up -d                # MinIO for staff photos
+```
+
+Default host ports use `DEV_PORT_PREFIX=30` (`3000`, `3004`, `3008`, …). To avoid clashes (e.g. worktrees):
+
+```sh
+DEV_PORT_PREFIX=80 docker compose up -d
+```
+
+Only prefixes `30` and `80` are fully supported for Google OAuth redirect URIs today.
+
+## Environment
+
+Copy `.env.template` → `.env` at the repo root. Compose injects this file into backend/datapuller. For local Docker networking, Mongo and Redis should stay as in the template, e.g.:
+
+```env
+MONGODB_URI=mongodb://mongodb:27017/bt?replicaSet=rs0
+REDIS_URI=redis://redis:6379
+```
+
+SIS / Google / AWS keys can stay as `_` placeholders for basic UI work; live datapuller pulls need real SIS credentials.
+
+## Seeding MongoDB
+
+Some pages need data. The bootstrap script restores a **public** backup by default.
+
+Manual restore (Mongo must already be up):
+
+```sh
+curl -f -o "prod-backup.gz" \
+  "https://backups.berkeleytime.com/public/daily/prod_public_backup-$(TZ=America/Los_Angeles date -v -6H +%Y%m%d).gz"
+
+docker cp ./prod-backup.gz berkeleytime-mongodb-1:/tmp/prod-backup.gz
+docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip --archive=/tmp/prod-backup.gz
+```
+
+Public backups are redacted. For fuller data, see [Fetch mongo backups](apps/docs/src/core/infrastructure/runbooks.md) (Cloudflare Access).
+
+`mongodb-init` also seeds switchable local dev users on first boot (`docker/mongodb/init/02-seed-dev-users.js`).
+
+## Catalog rebuild (optional)
+
+If denormalized catalog search data looks wrong after puller changes:
+
+```sh
+npx tsx scripts/rebuild-catalog.ts
+```
+
+(Or run it inside a container that can reach Mongo with the same `MONGODB_URI`.)
+
+## Maintainers / production
+
+Production is deployed with Kubernetes/Helm under `infra/`. See `apps/docs/src/core/infrastructure/` for runbooks (backups, secrets, CronJobs, datapuller triggers).
