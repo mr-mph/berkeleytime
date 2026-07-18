@@ -32,6 +32,7 @@ import { type IGradeDistribution } from "@/lib/api";
 import { type ICourseWithInstructorClass } from "@/lib/api/courses";
 import { sortByTermDescending } from "@/lib/classes";
 import {
+  GetCourseNumberByIdDocument,
   GetGradeDistributionDocument,
   Semester,
   TemporalPosition,
@@ -66,9 +67,26 @@ const loadOutputsFromInputs = async (
 
         if (!response.data?.grade) return null;
 
+        // URL inputs only carry the courseId; resolve the courseNumber for display
+        let resolvedInput = input;
+        if (!resolvedInput.courseNumber) {
+          try {
+            const courseResponse = await client.query({
+              query: GetCourseNumberByIdDocument,
+              variables: { courseId: input.courseId },
+            });
+            const number = courseResponse.data?.courseById?.number;
+            if (number) {
+              resolvedInput = { ...resolvedInput, courseNumber: number };
+            }
+          } catch {
+            // display-only lookup; keep the grade data even if it fails
+          }
+        }
+
         return {
           data: response.data.grade,
-          input,
+          input: resolvedInput,
         };
       } catch {
         return null;
