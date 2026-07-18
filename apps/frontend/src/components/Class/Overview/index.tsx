@@ -16,6 +16,7 @@ import useClass from "@/hooks/useClass";
 import { DeCal, DeCalInstructor } from "@/lib/generated/graphql";
 import { linkify } from "@/utils/linkify";
 
+import Articulations from "./Articulations";
 import styles from "./Overview.module.scss";
 import TargetedMessageBanner from "./TargetedMessageBanner";
 import { UserSubmittedData } from "./UserSubmittedData";
@@ -334,6 +335,7 @@ export default function Overview() {
             <p className={styles.label}>Description</p>
             <p className={styles.description}>{displayedDescription}</p>
           </Flex>
+          <Articulations />
           {classNoteLines && classNoteLines.length > 0 && (
             <Flex direction="column" gap="2">
               <p className={styles.label}>Class Notes</p>

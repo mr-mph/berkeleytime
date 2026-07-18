@@ -1,0 +1,124 @@
+.sectionLabel {
+  font-weight: var(--font-medium);
+  font-size: var(--text-14);
+  line-height: 20px;
+  color: var(--heading-color);
+  margin-bottom: 8px;
+}
+
+.item {
+  border-bottom: none;
+}
+
+.trigger {
+  flex: initial;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0;
+  font-size: var(--text-14);
+  font-weight: var(--font-normal);
+  color: var(--paragraph-color);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.content {
+  padding-top: 12px;
+  padding-bottom: 0;
+  font-size: var(--text-14);
+  line-height: 1.5;
+}
+
+.filter {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px 12px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 16px;
+  padding: 6px 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+  }
+}
+
+.college {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--paragraph-color);
+}
+
+// a.collegeLink outranks the theme's .contentInner a rule
+a.collegeLink {
+  color: var(--paragraph-color);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--blue-500);
+    text-decoration: underline;
+  }
+}
+
+.yearNote {
+  font-size: var(--text-12);
+  color: var(--label-color);
+}
+
+.equivalent {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  text-align: right;
+}
+
+.courses {
+  font-weight: var(--font-medium);
+  color: var(--heading-color);
+}
+
+.conjunction {
+  font-weight: var(--font-normal);
+  color: var(--label-color);
+}
+
+.seriesNote {
+  flex-basis: 100%;
+  font-size: var(--text-12);
+  color: var(--label-color);
+}
+
+.noteIcon {
+  align-self: center;
+  color: var(--label-color);
+  cursor: help;
+}
+
+.empty {
+  padding: 8px 0;
+  color: var(--label-color);
+}
+
+.attribution {
+  margin-top: 8px;
+  font-size: var(--text-12);
+  color: var(--label-color);
+}

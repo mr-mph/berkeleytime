@@ -24,6 +24,8 @@ export const courseTypeDef = gql`
     aggregatedRatings(metricNames: [MetricName!]): AggregatedRatings!
     instructorAggregatedRatings: [InstructorRating!]!
     gradeDistribution: GradeDistribution!
+    "Community college course equivalents from ASSIST.org transfer agreements"
+    articulations: [CourseArticulation!]!
 
     "Attributes"
     requirements: String
@@ -39,6 +41,35 @@ export const courseTypeDef = gql`
     primaryInstructionMethod: InstructionMethod!
     toDate: String!
     typicallyOffered: [String!]
+  }
+
+  type CourseArticulation {
+    "ASSIST.org institution ID of the sending community college"
+    institutionId: Int!
+    institutionName: String!
+    "Agreement academic year, e.g. 2025-2026"
+    academicYear: String!
+    "Other Berkeley courses articulated together with this one as a series"
+    seriesWith: [String!]
+    "Alternative ways to articulate; courses within an option are all required"
+    options: [ArticulationOption!]!
+    "Advisory notes from the ASSIST agreement"
+    notes: [String!]
+    "Link to the full agreement on ASSIST.org"
+    assistUrl: String!
+  }
+
+  type ArticulationOption {
+    courses: [ArticulationCourse!]!
+  }
+
+  type ArticulationCourse {
+    "Course prefix at the sending college, e.g. CIS"
+    prefix: String!
+    number: String!
+    title: String
+    minUnits: Float
+    maxUnits: Float
   }
 
   enum CourseGradingBasis {

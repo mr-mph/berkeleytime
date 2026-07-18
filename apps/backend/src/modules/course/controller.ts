@@ -1,4 +1,5 @@
 import {
+  ArticulationModel,
   ClassModel,
   CourseModel,
   IClassItem,
@@ -9,6 +10,50 @@ import { buildSubjectQuery } from "../../utils/subject";
 import { formatClass } from "../class/formatter";
 import { IntermediateCourse, formatCourse } from "./formatter";
 import { CourseModule } from "./generated-types/module-types";
+
+// UC Berkeley's institution ID on ASSIST.org
+const ASSIST_UC_BERKELEY_ID = 79;
+
+const buildAssistAgreementUrl = (
+  academicYearId: number,
+  institutionId: number
+) => {
+  const key = `${academicYearId}/${institutionId}/to/${ASSIST_UC_BERKELEY_ID}/AllDepartments`;
+  return (
+    `https://assist.org/transfer/results?year=${academicYearId}` +
+    `&institution=${institutionId}&agreement=${ASSIST_UC_BERKELEY_ID}` +
+    `&agreementType=to&view=agreement&viewBy=dept` +
+    `&viewByKey=${encodeURIComponent(key)}`
+  );
+};
+
+export const getArticulationsByCourse = async (
+  subject: string,
+  number: string
+): Promise<CourseModule.CourseArticulation[]> => {
+  const articulations = await ArticulationModel.find({
+    subject: buildSubjectQuery(subject),
+    number,
+  })
+    .collation({ locale: "en", strength: 2 })
+    .sort({ institutionName: 1 })
+    .lean();
+
+  return articulations.map((articulation) => ({
+    institutionId: articulation.institutionId,
+    institutionName: articulation.institutionName,
+    academicYear: articulation.academicYear,
+    seriesWith: articulation.seriesWith?.length
+      ? articulation.seriesWith
+      : null,
+    options: articulation.options,
+    notes: articulation.notes?.length ? articulation.notes : null,
+    assistUrl: buildAssistAgreementUrl(
+      articulation.academicYearId,
+      articulation.institutionId
+    ),
+  }));
+};
 
 export const getCourse = async (subject: string, number: string) => {
   const course = await CourseModel.findOne({

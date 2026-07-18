@@ -1,3 +1,4 @@
+export * from "./articulation";
 export * from "./schedule";
 export * from "./user";
 export * from "./class";

@@ -285,6 +285,21 @@ export const GET_CLASS_DETAILS = gql`
           average
           pnpPercentage
         }
+        articulations {
+          institutionId
+          institutionName
+          academicYear
+          seriesWith
+          options {
+            courses {
+              prefix
+              number
+              title
+            }
+          }
+          notes
+          assistUrl
+        }
       }
       primarySection {
         sectionId

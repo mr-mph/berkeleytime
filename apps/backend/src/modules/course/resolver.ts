@@ -10,6 +10,7 @@ import {
   getInstructorAggregatedRatings,
 } from "../rating/controller";
 import {
+  getArticulationsByCourse,
   getAssociatedCoursesById,
   getAssociatedCoursesBySubjectNumber,
   getClassesByCourse,
@@ -272,6 +273,10 @@ const resolvers: CourseModule.Resolvers = {
       );
 
       return instructorRatings;
+    },
+
+    articulations: async (parent: IntermediateCourse | CourseModule.Course) => {
+      return await getArticulationsByCourse(parent.subject, parent.number);
     },
   },
 
