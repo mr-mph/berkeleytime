@@ -6,10 +6,12 @@ import { DropdownMenu } from "@repo/theme";
 
 import useUser from "@/hooks/useUser";
 import {
+  DEFAULT_DEV_USER_EMAIL,
   DEV_AUTH_LOGIN_ROUTE,
   DEV_AUTH_USERS_ROUTE,
   DevUser,
   clearStoredDevUserId,
+  getStoredDevUserId,
   isDevAuthCollapsed,
   setDevAuthCollapsed,
   setStoredDevUserId,
@@ -39,6 +41,22 @@ export default function DevAuthBanner() {
     const redirectUri = window.location.pathname + window.location.search;
     window.location.href = `${DEV_AUTH_LOGIN_ROUTE}?userId=${userId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
   };
+
+  // Auto-login as the stored dev user (or the default seed account) so
+  // logged-in features like ratings work without picking a user first.
+  useEffect(() => {
+    if (loading || userLoading || user || devUsers.length === 0) return;
+    // A failed dev login redirects back with devAuthError; don't loop.
+    if (new URLSearchParams(window.location.search).has("devAuthError")) return;
+
+    const storedId = getStoredDevUserId();
+    const defaultUser =
+      devUsers.find((u) => u._id === storedId) ??
+      devUsers.find((u) => u.email === DEFAULT_DEV_USER_EMAIL) ??
+      devUsers[0];
+
+    selectUser(defaultUser._id);
+  }, [loading, userLoading, user, devUsers]);
 
   const clearSelection = () => {
     clearStoredDevUserId();

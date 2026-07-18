@@ -11,6 +11,9 @@ export const DEV_AUTH_COLLAPSED_KEY = "bt.devAuth.collapsed";
 export const DEV_AUTH_LOGIN_ROUTE = "/api/dev/login";
 export const DEV_AUTH_USERS_ROUTE = "/api/dev/users";
 
+// Seed account to auto-login as when no user is signed in
+export const DEFAULT_DEV_USER_EMAIL = "dev@berkeleytime.local";
+
 // Types
 export interface DevUser {
   _id: string;
