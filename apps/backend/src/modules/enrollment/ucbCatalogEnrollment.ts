@@ -5,6 +5,7 @@ import {
   UcbCatalogEnrollmentError,
   buildUcbCatalogUrl as sharedBuildUcbCatalogUrl,
   fetchUcbCatalogEnrollment as sharedFetchUcbCatalogEnrollment,
+  isBlankUcbEnrollment as sharedIsBlankUcbEnrollment,
 } from "@repo/shared";
 
 export type {
@@ -13,6 +14,7 @@ export type {
 } from "@repo/shared";
 
 export const buildUcbCatalogUrl = sharedBuildUcbCatalogUrl;
+export const isBlankUcbEnrollment = sharedIsBlankUcbEnrollment;
 
 function mapUcbError(error: unknown): never {
   if (error instanceof UcbCatalogEnrollmentError) {

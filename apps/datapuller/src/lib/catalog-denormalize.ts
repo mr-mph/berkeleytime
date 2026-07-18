@@ -192,7 +192,11 @@ export const buildCatalogClasses = async (
     ClassModel.find({
       year,
       semester,
-      $or: [{ anyPrintInScheduleOfClasses: true }, { decal: { $ne: null } }],
+      // Real DeCals always have a title; ignore stub `{ instructors: [] }` docs.
+      $or: [
+        { anyPrintInScheduleOfClasses: true },
+        { "decal.title": { $exists: true, $nin: [null, ""] } },
+      ],
     }).lean(),
   ]);
 

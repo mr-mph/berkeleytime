@@ -2,7 +2,7 @@
 # Local/dev datapuller schedule (lighter than prod; skips last-five-years jobs).
 # Intervals:
 #   enrollments                 every 5 minutes
-#   ucb-catalog-enrollments     continuous (60s between passes)
+#   ucb-catalog-enrollments     continuous (no gap between passes)
 #   catalog refresh set         every 12 hours
 #   daily extras                every 24 hours
 
@@ -29,12 +29,11 @@ echo "Datapuller dev scheduler started."
 ) &
 
 # Enrollment: classes.berkeley.edu scrape (prominence-ordered).
-# Long gap between full passes; within a pass, recently-scraped classes are skipped.
+# Loop continuously; within a pass, recently-scraped classes are skipped (TTL in puller).
 (
   sleep 15
   while true; do
     run_puller ucb-catalog-enrollments
-    sleep 3600
   done
 ) &
 

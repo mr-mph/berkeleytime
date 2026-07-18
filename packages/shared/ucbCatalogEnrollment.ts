@@ -31,6 +31,14 @@ export type ParsedUcbCatalogEnrollment = {
   associatedSections: ParsedUcbEnrollment[];
 };
 
+/** True when the catalog page has no usable seat counts (common on non-controlling cross-listings). */
+export function isBlankUcbEnrollment(
+  scraped: Pick<ParsedUcbEnrollment, "enrolledCount" | "maxEnroll"> | null | undefined
+): boolean {
+  if (!scraped) return true;
+  return (scraped.maxEnroll ?? 0) <= 0 && (scraped.enrolledCount ?? 0) <= 0;
+}
+
 export type UcbCatalogEnrollmentErrorCode =
   | "BAD_USER_INPUT"
   | "INTERNAL_SERVER_ERROR";

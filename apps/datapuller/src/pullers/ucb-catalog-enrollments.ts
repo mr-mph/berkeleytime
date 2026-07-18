@@ -14,6 +14,7 @@ import {
   UcbCatalogEnrollmentError,
   buildUcbCatalogUrl,
   fetchUcbCatalogEnrollment,
+  isBlankUcbEnrollment,
 } from "@repo/shared";
 
 import { updateCatalogEnrollment } from "../lib/catalog-denormalize";
@@ -223,6 +224,94 @@ const persistScrapedSectionEnrollment = async (
       enrollmentUpdatedAt: now,
     },
   };
+};
+
+const findCombinedSiblingSections = async (
+  section: ISectionItem
+): Promise<ISectionItem[]> => {
+  const combinedIds = (section.combinedSections ?? [])
+    .map(String)
+    .filter((id) => id !== String(section.sectionId));
+  if (combinedIds.length === 0) return [];
+
+  return (await SectionModel.find({
+    year: section.year,
+    semester: section.semester,
+    sessionId: section.sessionId,
+    sectionId: { $in: combinedIds },
+  }).lean()) as ISectionItem[];
+};
+
+/** Persist enrollment to a section and every SIS combinedSections sibling. */
+const persistScrapedSectionEnrollmentWithFanOut = async (
+  year: number,
+  semester: string,
+  section: ISectionItem,
+  scraped: ParsedUcbEnrollment,
+  now: Date
+): Promise<Array<{ sectionId: string; patch: CatalogEnrollmentPatch }>> => {
+  const siblings = await findCombinedSiblingSections(section);
+  const targets = [section, ...siblings];
+  const seen = new Set<string>();
+  const results: Array<{ sectionId: string; patch: CatalogEnrollmentPatch }> =
+    [];
+
+  for (const target of targets) {
+    if (seen.has(target.sectionId)) continue;
+    seen.add(target.sectionId);
+    results.push(
+      await persistScrapedSectionEnrollment(
+        year,
+        semester,
+        target,
+        scraped,
+        now
+      )
+    );
+  }
+
+  return results;
+};
+
+const matchAssociatedScrapedEnrollment = (
+  section: ISectionItem,
+  associatedBySectionId: Map<string, ParsedUcbEnrollment>,
+  associatedByNumber: Map<string, ParsedUcbEnrollment>
+): ParsedUcbEnrollment | undefined => {
+  const byId = associatedBySectionId.get(section.sectionId);
+  if (byId) return byId;
+
+  const byNumber = associatedByNumber.get(section.number);
+  if (byNumber) return byNumber;
+
+  for (const combinedId of section.combinedSections ?? []) {
+    const byCombined = associatedBySectionId.get(String(combinedId));
+    if (byCombined) return byCombined;
+  }
+
+  return undefined;
+};
+
+const scrapeEnrollmentForSection = async (
+  section: ISectionItem,
+  log: Config["log"]
+): Promise<Awaited<ReturnType<typeof fetchUcbCatalogEnrollment>> | null> => {
+  if (!section.component) return null;
+  const url = buildUcbCatalogUrl({
+    year: section.year,
+    semester: section.semester,
+    subject: section.subject,
+    courseNumber: section.courseNumber,
+    number: section.number,
+    component: section.component,
+  });
+  try {
+    const scraped = await fetchWithRetry(url, log);
+    if (isBlankUcbEnrollment(scraped.primary)) return null;
+    return scraped;
+  } catch {
+    return null;
+  }
 };
 
 const isRetryableError = (error: unknown): boolean => {
@@ -493,17 +582,38 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
       return;
     }
 
-    const url = buildUcbCatalogUrl({
-      year: catalogClass.year,
-      semester: catalogClass.semester,
-      subject: primarySection.subject,
-      courseNumber: primarySection.courseNumber,
-      number: primarySection.number,
-      component: primarySection.component,
-    });
+    const combinedSiblings = await findCombinedSiblingSections(
+      primarySection as ISectionItem
+    );
+    const scrapeCandidates = [
+      primarySection as ISectionItem,
+      ...combinedSiblings,
+    ];
 
     try {
-      const scraped = await fetchWithRetry(url, log);
+      let scraped: Awaited<ReturnType<typeof fetchUcbCatalogEnrollment>> | null =
+        null;
+
+      for (const candidate of scrapeCandidates) {
+        scraped = await scrapeEnrollmentForSection(candidate, log);
+        if (scraped) {
+          if (candidate.sectionId !== primarySection.sectionId) {
+            log.info(
+              `Using cross-listed enrollment from ${candidate.subject} ${candidate.courseNumber} ${candidate.number} for ${label}`
+            );
+          }
+          break;
+        }
+      }
+
+      if (!scraped) {
+        await bumpProgress(label, "fail");
+        log.warn(
+          `Failed ${label}: no usable enrollment on this listing or combinedSections siblings`
+        );
+        return;
+      }
+
       const now = new Date();
       const patches: Array<{
         sectionId: string;
@@ -511,13 +621,13 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
       }> = [];
 
       patches.push(
-        await persistScrapedSectionEnrollment(
+        ...(await persistScrapedSectionEnrollmentWithFanOut(
           catalogClass.year,
           catalogClass.semester,
           primarySection as ISectionItem,
           scraped.primary,
           now
-        )
+        ))
       );
 
       if (scraped.associatedSections.length > 0) {
@@ -532,6 +642,12 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
             .filter((section) => section.sectionNumber)
             .map((section) => [section.sectionNumber!, section])
         );
+        const scrapedSectionIds = scraped.associatedSections.map(
+          (section) => section.sectionId
+        );
+        const scrapedSectionIdNums = scrapedSectionIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id));
 
         const associatedSections = await SectionModel.find({
           year: catalogClass.year,
@@ -541,25 +657,35 @@ const scrapeTerm = async (config: Config, year: number, semester: string) => {
           courseNumber: catalogClass.courseNumber,
           primary: false,
           $or: [
-            { sectionId: { $in: [...associatedBySectionId.keys()] } },
+            { sectionId: { $in: scrapedSectionIds } },
             { number: { $in: [...associatedByNumber.keys()] } },
+            ...(scrapedSectionIdNums.length > 0
+              ? [{ combinedSections: { $in: scrapedSectionIdNums } }]
+              : []),
           ],
         }).lean();
 
+        const seenAssociated = new Set<string>();
         for (const section of associatedSections) {
-          const match =
-            associatedBySectionId.get(section.sectionId) ??
-            associatedByNumber.get(section.number);
-          if (!match) continue;
-          patches.push(
-            await persistScrapedSectionEnrollment(
-              catalogClass.year,
-              catalogClass.semester,
-              section as ISectionItem,
-              match,
-              now
-            )
+          const match = matchAssociatedScrapedEnrollment(
+            section as ISectionItem,
+            associatedBySectionId,
+            associatedByNumber
           );
+          if (!match || seenAssociated.has(section.sectionId)) continue;
+          seenAssociated.add(section.sectionId);
+
+          const fanOutPatches = await persistScrapedSectionEnrollmentWithFanOut(
+            catalogClass.year,
+            catalogClass.semester,
+            section as ISectionItem,
+            match,
+            now
+          );
+          for (const patch of fanOutPatches) {
+            seenAssociated.add(patch.sectionId);
+            patches.push(patch);
+          }
         }
       }
 

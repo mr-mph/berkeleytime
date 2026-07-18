@@ -420,10 +420,13 @@ const buildFilterQuery = (
     const otherLevels = filters.levels.filter((level) => level !== "DeCal");
 
     if (wantsDecal && otherLevels.length === 0) {
-      query.decal = { $ne: null };
+      query["decal.title"] = { $exists: true, $nin: [null, ""] };
     } else if (wantsDecal && otherLevels.length > 0) {
       appendAndCondition(query, {
-        $or: [{ level: { $in: otherLevels } }, { decal: { $ne: null } }],
+        $or: [
+          { level: { $in: otherLevels } },
+          { "decal.title": { $exists: true, $nin: [null, ""] } },
+        ],
       });
     } else {
       query.level = { $in: otherLevels };
@@ -692,7 +695,11 @@ export const getCatalogLegacy = async (
     ClassModel.find({
       year,
       semester,
-      $or: [{ anyPrintInScheduleOfClasses: true }, { decal: { $ne: null } }],
+      // Real DeCals always have a title; ignore stub `{ instructors: [] }` docs.
+      $or: [
+        { anyPrintInScheduleOfClasses: true },
+        { "decal.title": { $exists: true, $nin: [null, ""] } },
+      ],
     }).lean(),
   ]);
 
