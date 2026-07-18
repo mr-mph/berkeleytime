@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 
 import { updateCatalogGradeSummaries } from "./lib/catalog-denormalize";
+import articulationsPuller from "./pullers/articulations";
 import classesPuller from "./pullers/classes";
 import coursesPuller from "./pullers/courses";
 import decalsPuller from "./pullers/decals";
@@ -24,6 +25,7 @@ const cliArgs = {
 const pullerMap: {
   [key: string]: (config: Config, ...arg: any) => Promise<unknown>;
 } = {
+  articulations: articulationsPuller.updateArticulations,
   courses: coursesPuller.updateCourses,
   decals: decalsPuller.scrapeDeCals,
   "sections-active": sectionsPuller.activeTerms,

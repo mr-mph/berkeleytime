@@ -751,7 +751,7 @@ export default function Class({
                   {hasCourseGradeSummary && (
                     <Link
                       to={`/grades?input=${encodeURIComponent(
-                        `${_class.subject};${_class.courseNumber}`
+                        `${_class.subject};${_class.courseId}`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"

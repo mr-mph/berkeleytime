@@ -108,3 +108,8 @@ datapuller:
     enrollment-timeframe:
       schedule: "40 4 * * *"
       args: ["--puller=enrollment-timeframe"]
+
+    # ASSIST.org agreements update ~yearly; weekly keeps them fresh gently
+    articulations:
+      schedule: "50 4 * * 0"
+      args: ["--puller=articulations"]

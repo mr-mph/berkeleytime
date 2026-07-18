@@ -270,7 +270,7 @@ export const GET_CLASS_DETAILS = gql`
         title
         description
         requirements
-        aggregatedRatings(metricNames: [Attendance, Recording]) {
+        aggregatedRatings {
           metrics {
             metricName
             count
@@ -284,6 +284,21 @@ export const GET_CLASS_DETAILS = gql`
         gradeDistribution {
           average
           pnpPercentage
+        }
+        articulations {
+          institutionId
+          institutionName
+          academicYear
+          seriesWith
+          options {
+            courses {
+              prefix
+              number
+              title
+            }
+          }
+          notes
+          assistUrl
         }
       }
       primarySection {
