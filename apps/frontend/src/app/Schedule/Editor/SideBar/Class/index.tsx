@@ -623,6 +623,23 @@ export default function Class({
                               sectionNumber
                             )
                           }
+                          onBlockToggle={(blocked) => {
+                            for (const section of slotSections) {
+                              const currentlyBlocked = Boolean(
+                                blockedSections?.find(
+                                  (s) => s === section.sectionId
+                                )
+                              );
+                              if (currentlyBlocked === blocked) continue;
+                              onSectionBlockToggle(
+                                _class.subject,
+                                _class.courseNumber,
+                                _class.number,
+                                section.sectionId,
+                                blocked
+                              );
+                            }
+                          }}
                         />
                       );
                     })
