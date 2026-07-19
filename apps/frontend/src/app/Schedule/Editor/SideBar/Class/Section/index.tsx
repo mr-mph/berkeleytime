@@ -17,6 +17,7 @@ interface SectionProps {
   active: boolean;
   blocked?: boolean;
   editing?: boolean;
+  showCcn?: boolean;
 }
 
 export default function Section({
@@ -27,6 +28,7 @@ export default function Section({
   active,
   blocked = false,
   editing = true,
+  showCcn = true,
   sectionId,
   number,
   meetings,
@@ -50,7 +52,7 @@ export default function Section({
     >
       <div className={styles.radioButton} />
       <p className={styles.title}>{number}</p>
-      <CCN sectionId={sectionId} tooltip={false} />
+      {showCcn && <CCN sectionId={sectionId} tooltip={false} />}
       <Time
         endTime={meeting?.endTime ?? null}
         startTime={meeting?.startTime ?? null}
