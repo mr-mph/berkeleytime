@@ -78,6 +78,7 @@ export default function GradeBarGraph({
   const thumbLabelLeftRef = useRef<HTMLSpanElement>(null);
   const thumbLabelRightRef = useRef<HTMLSpanElement>(null);
   const [showPassNoPass, setShowPassNoPass] = useState(false);
+  const [showAsStudentCount, setShowAsStudentCount] = useState(false);
   const throttleTimeoutRef = useRef<number | null>(null);
   const pendingRangeRef = useRef<[number, number] | null>(null);
   const lastRangeCommitAtRef = useRef(0);
@@ -171,46 +172,35 @@ export default function GradeBarGraph({
       }, 0);
     });
 
-    // Build percentage for each letter grade per course
-    const percentages = displayedGrades.map((letter) => {
-      const row: Record<string, number> = {};
+    // Build percentage and count for each letter grade per course
+    const chartData = displayedGrades.map((letter) => {
+      const row: Record<string, number | string> = { letter };
       outputs.forEach((output, i) => {
+        const key = dataKeys[i];
         const dist = output.data?.distribution;
-        if (!dist || totals[i] === 0) {
-          row[dataKeys[i]] = 0;
-          return;
-        }
-        const grade = dist.find((g) => g.letter === letter);
-        row[dataKeys[i]] = ((grade?.count ?? 0) / totals[i]) * 100;
+        const grade = dist?.find((g) => g.letter === letter);
+        const count = grade?.count ?? 0;
+        const percent = totals[i] === 0 ? 0 : (count / totals[i]) * 100;
+        row[`${key}_count`] = count;
+        row[`${key}_percent`] = percent;
+        row[key] = showAsStudentCount ? count : percent;
       });
       return row;
     });
 
-    // Pre-compute cumulative percentiles (from F upward)
-    const cumulative: Record<string, number>[] = Array.from(
-      { length: displayedGrades.length },
-      () => ({})
-    );
+    // Pre-compute cumulative percentiles (from F upward) from percentages
     dataKeys.forEach((key) => {
       let cum = 0;
-      for (let i = displayedGrades.length - 1; i >= 0; i--) {
-        cumulative[i][key] = cum;
-        cum += percentages[i][key];
+      for (let i = chartData.length - 1; i >= 0; i--) {
+        const percent = chartData[i][`${key}_percent`] as number;
+        chartData[i][`${key}_pctlLo`] = cum;
+        chartData[i][`${key}_pctlHi`] = cum + percent;
+        cum += percent;
       }
     });
 
-    const chartData = displayedGrades.map((letter, i) => {
-      const row: Record<string, number | string> = { letter };
-      dataKeys.forEach((key) => {
-        row[key] = percentages[i][key];
-        row[`${key}_pctlLo`] = cumulative[i][key];
-        row[`${key}_pctlHi`] = cumulative[i][key] + percentages[i][key];
-      });
-      return row;
-    });
-
     return { chartData, chartConfig, dataKeys };
-  }, [outputs, displayedGrades]);
+  }, [outputs, displayedGrades, showAsStudentCount]);
 
   const commitSliderRange = useCallback((next: [number, number]) => {
     lastRangeCommitAtRef.current = Date.now();
@@ -315,6 +305,10 @@ export default function GradeBarGraph({
     Math.round(viewportHeight * chartHeightRatio)
   );
   const emptyGraphHeight = chartHeight + 32;
+  const valueTickFormatter = (v: number) =>
+    showAsStudentCount
+      ? formatters.number(Math.round(v))
+      : formatters.percent(v, 0);
   const graphControls = (
     <div className={styles.graphHeader}>
       <label className={styles.switchRow}>
@@ -323,6 +317,14 @@ export default function GradeBarGraph({
           checked={showPassNoPass}
           onCheckedChange={setShowPassNoPass}
           aria-label="Show P/NP columns"
+        />
+      </label>
+      <label className={styles.switchRow}>
+        <span className={styles.switchLabel}>Show as student count</span>
+        <Switch
+          checked={showAsStudentCount}
+          onCheckedChange={setShowAsStudentCount}
+          aria-label="Show as student count"
         />
       </label>
     </div>
@@ -364,9 +366,12 @@ export default function GradeBarGraph({
                       type="number"
                       domain={[
                         0,
-                        (dataMax: number) => Math.ceil(dataMax / 5) * 5,
+                        (dataMax: number) =>
+                          showAsStudentCount
+                            ? Math.ceil(dataMax / 5) * 5 || 5
+                            : Math.ceil(dataMax / 5) * 5,
                       ]}
-                      tickFormatter={(v) => formatters.percent(v, 0)}
+                      tickFormatter={valueTickFormatter}
                       tick={{
                         fill: "var(--paragraph-color)",
                         fontSize: "var(--text-12)",
@@ -388,12 +393,15 @@ export default function GradeBarGraph({
                       }}
                     />
                     <YAxis
-                      width={36}
+                      width={showAsStudentCount ? 44 : 36}
                       domain={[
                         0,
-                        (dataMax: number) => Math.ceil(dataMax / 5) * 5,
+                        (dataMax: number) =>
+                          showAsStudentCount
+                            ? Math.ceil(dataMax / 5) * 5 || 5
+                            : Math.ceil(dataMax / 5) * 5,
                       ]}
-                      tickFormatter={(v) => formatters.percent(v, 0)}
+                      tickFormatter={valueTickFormatter}
                       tick={{
                         fill: "var(--paragraph-color)",
                         fontSize: "var(--text-12)",
@@ -422,6 +430,8 @@ export default function GradeBarGraph({
                             const row = item.payload;
                             const pctlLo = row[`${key}_pctlLo`] as number;
                             const pctlHi = row[`${key}_pctlHi`] as number;
+                            const count = row[`${key}_count`] as number;
+                            const percent = row[`${key}_percent`] as number;
                             return (
                               <div key={key} className={styles.tooltipItem}>
                                 <span className={styles.tooltipItemLabel}>
@@ -438,7 +448,9 @@ export default function GradeBarGraph({
                                   {chartConfig[key]?.label ?? item.name}
                                 </span>
                                 <span className={styles.tooltipItemValue}>
-                                  {formatters.percent(item.value, 1)}
+                                  {showAsStudentCount
+                                    ? formatters.number(count)
+                                    : formatters.percent(percent, 1)}
                                 </span>
                                 <span className={styles.tooltipItemValue}>
                                   {ordinal(Math.round(pctlLo))}–
