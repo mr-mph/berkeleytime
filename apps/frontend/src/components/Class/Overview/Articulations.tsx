@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 
-import { InfoCircle } from "iconoir-react";
+import {
+  Clock,
+  InfoCircle,
+  WarningCircle,
+  WarningTriangle,
+} from "iconoir-react";
 
 import {
   Accordion,
@@ -16,6 +21,26 @@ import useClass from "@/hooks/useClass";
 import styles from "./Articulations.module.scss";
 
 const FILTER_THRESHOLD = 10;
+
+// distinct icons keyed off ASSIST's recurring note phrasings: triangle for
+// extra coursework required after transfer, clock for an agreement about to
+// change, circle-! for restricted or partial articulation, circle-i otherwise
+const iconForNote = (note: string) => {
+  if (/\buniversity course\b/i.test(note)) return WarningTriangle;
+  if (/\b(revised|effective)\b/i.test(note)) return Clock;
+  if (/\b(only|not articulated|does not include|limitation)\b/i.test(note))
+    return WarningCircle;
+  return InfoCircle;
+};
+
+const groupNotesByIcon = (notes: string[]) => {
+  const groups = new Map<typeof InfoCircle, string[]>();
+  for (const note of notes) {
+    const icon = iconForNote(note);
+    groups.set(icon, [...(groups.get(icon) ?? []), note]);
+  }
+  return [...groups.entries()];
+};
 
 export default function Articulations() {
   const { course } = useClass();
@@ -112,14 +137,22 @@ export default function Articulations() {
                         </span>
                       ))}
                     </span>
-                    {articulation.notes && articulation.notes.length > 0 && (
-                      <Tooltip
-                        trigger={
-                          <InfoCircle className={styles.noteIcon} width={14} />
-                        }
-                        content={articulation.notes.join(" ")}
-                      />
-                    )}
+                    {articulation.notes &&
+                      articulation.notes.length > 0 &&
+                      groupNotesByIcon(articulation.notes).map(
+                        ([NoteIcon, notes]) => (
+                          <Tooltip
+                            key={notes[0]}
+                            trigger={
+                              <NoteIcon
+                                className={styles.noteIcon}
+                                width={14}
+                              />
+                            }
+                            content={notes.join(" ")}
+                          />
+                        )
+                      )}
                     {articulation.seriesWith &&
                       articulation.seriesWith.length > 0 && (
                         <div className={styles.seriesNote}>
