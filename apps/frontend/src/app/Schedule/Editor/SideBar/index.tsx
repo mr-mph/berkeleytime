@@ -7,6 +7,7 @@ import { Button } from "@repo/theme";
 import Units from "@/components/Units";
 import useSchedule from "@/hooks/useSchedule";
 import { IScheduleClass, IScheduleEvent } from "@/lib/api";
+import { finalExamKey, getScheduleFinalExams } from "@/lib/finalExam";
 import { Color, Component } from "@/lib/generated/graphql";
 
 import { getUnits } from "../../schedule";
@@ -111,6 +112,11 @@ export default function SideBar({
 
   const [minimum, maximum] = useMemo(() => getUnits(schedule), [schedule]);
 
+  const finalExams = useMemo(
+    () => getScheduleFinalExams(schedule),
+    [schedule]
+  );
+
   useEffect(() => {
     if (!bodyRef.current) return;
 
@@ -196,11 +202,17 @@ export default function SideBar({
           );
         })}
         {schedule.classes.map((selectedClass, index) => {
+          const finalExamEntry = finalExams.get(
+            finalExamKey(selectedClass.class)
+          );
+
           return (
             <Class
               key={`${selectedClass.class.subject}${selectedClass.class.courseNumber}${selectedClass.class.number}`}
               class={selectedClass.class}
               selectedSections={selectedClass.selectedSections}
+              finalExam={finalExamEntry?.exam}
+              finalExamConflicts={finalExamEntry?.conflicts}
               semester={schedule.semester}
               year={schedule.year}
               sessionId={schedule.sessionId}

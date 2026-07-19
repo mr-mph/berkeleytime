@@ -19,6 +19,9 @@
 .cardContent {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  min-height: 100%;
 }
 
 .topRow {
@@ -47,6 +50,12 @@
   flex-wrap: wrap;
   column-gap: 12px;
   row-gap: 8px;
+
+  &.singleLine {
+    flex-wrap: nowrap;
+    column-gap: 8px;
+    min-width: 0;
+  }
 }
 
 .ratingEnd {
@@ -54,6 +63,49 @@
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+.actionsColumn {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  /* Top/bottom match Card.Body (16px) so icons line up with grade + RMP.
+     Right = body padding + color-bar width so icons inset like the left. */
+  padding: 16px 24px 16px 12px;
+  box-sizing: border-box;
+
+  [data-action-icon] {
+    color: var(--paragraph-color);
+    transition: color 100ms ease-in-out;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+
+    &:hover {
+      color: var(--heading-color);
+    }
+  }
+}
+
+.actionsTop {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  /* Heading is text-16 / line-height 1 — same band as the grade */
+  min-height: 16px;
+}
+
+.actionsBottom {
+  display: flex;
+  align-items: center;
+  /* Footer / RMP row is text-14 / line-height 1 */
+  min-height: 14px;
 }
 
 .reservedSeating {

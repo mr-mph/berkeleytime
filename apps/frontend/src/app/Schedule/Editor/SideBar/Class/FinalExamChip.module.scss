@@ -1,0 +1,35 @@
+.chip {
+  font-size: var(--text-14);
+  color: var(--paragraph-color);
+  line-height: 1;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+
+  &.conflict {
+    color: var(--red-500);
+  }
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 240px;
+}
+
+.estimated {
+  color: var(--label-color);
+}
+
+.conflictText {
+  color: var(--red-500);
+}

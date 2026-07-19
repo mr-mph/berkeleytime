@@ -20,6 +20,7 @@ import Week from "@/app/Schedule/Editor/Week";
 import { useUpdateSchedule } from "@/hooks/api";
 import useSchedule from "@/hooks/useSchedule";
 import { IScheduleClass, IScheduleEvent } from "@/lib/api";
+import { finalExamKey, getScheduleFinalExams } from "@/lib/finalExam";
 import { Color, Component, GetClassDocument } from "@/lib/generated/graphql";
 import { RecentType, addRecent } from "@/lib/recent";
 
@@ -89,6 +90,28 @@ export default function Editor() {
     () => getSelectedSections(schedule),
     [schedule]
   );
+
+  // Final exams estimated from the registrar's calendar, for classes
+  // whose sections have no SIS-published exam to plot.
+  const derivedExams = useMemo(() => {
+    const finalExams = getScheduleFinalExams(schedule);
+
+    return schedule.classes.flatMap((selectedClass) => {
+      if (selectedClass.hidden) return [];
+      const exam = finalExams.get(finalExamKey(selectedClass.class))?.exam;
+      if (exam?.source !== "derived") return [];
+      return [
+        {
+          subject: selectedClass.class.subject,
+          courseNumber: selectedClass.class.courseNumber,
+          date: exam.date,
+          startTime: exam.startTime,
+          endTime: exam.endTime,
+          color: selectedClass.color as Color,
+        },
+      ];
+    });
+  }, [schedule]);
 
   // Radix and Floating UI reference the boundary by id
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -1257,6 +1280,7 @@ export default function Editor() {
               customEvents={schedule.events.filter((e) => !e.hidden)}
               selectedSections={selectedSections}
               currentSection={currentSection}
+              derivedExams={derivedExams}
             />
           ) : (
             <Map selectedSections={selectedSections} />

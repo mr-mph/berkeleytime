@@ -1,5 +1,6 @@
 import { ComponentPropsWithRef, Fragment, ReactNode } from "react";
 
+import classNames from "classnames";
 import {
   ArrowSeparateVertical,
   ArrowUnionVertical,
@@ -104,6 +105,8 @@ interface ClassProps {
   topRightContent?: ReactNode;
   infoContent?: ReactNode;
   replaceInfoContent?: boolean;
+  /** Keep footer enrollment/units/info/rating on one line (e.g. narrow sidebar). */
+  singleLineInfo?: boolean;
   headingPrefix?: ReactNode;
   subtitle?: ReactNode;
   gradeInFooter?: boolean;
@@ -125,6 +128,7 @@ export default function ClassCard({
   topRightContent,
   infoContent,
   replaceInfoContent = false,
+  singleLineInfo = false,
   headingPrefix,
   subtitle,
   gradeInFooter = false,
@@ -170,7 +174,8 @@ export default function ClassCard({
       <Card.ColumnHeader
         style={{
           overflow: "visible",
-          marginLeft: leftBorderColor ? "8px" : undefined,
+          // Offset content past the absolute 8px color bar
+          marginLeft: leftBorderColor ? 8 : undefined,
         }}
       >
         <Card.Body>
@@ -251,7 +256,11 @@ export default function ClassCard({
                 </div>
               )}
             </div>
-            <Card.Footer className={styles.infoRow}>
+            <Card.Footer
+              className={classNames(styles.infoRow, {
+                [styles.singleLine]: singleLineInfo,
+              })}
+            >
               {!replaceInfoContent && (
                 <>
                   {gradeInFooter && gradeDistribution && (
@@ -360,7 +369,46 @@ export default function ClassCard({
                   }}
                 />
               </div>
-              {expandable && onExpandedChange !== undefined && (
+            </Card.Footer>
+          </div>
+        </Card.Body>
+        {(onUnlock || customActionMenu || onDelete || expandable) && (
+          <div className={styles.actionsColumn} data-actions>
+            <div className={styles.actionsTop}>
+              {onUnlock && (
+                <Card.ActionIcon
+                  data-action-icon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onUnlock();
+                  }}
+                >
+                  <Lock />
+                </Card.ActionIcon>
+              )}
+              {customActionMenu ? (
+                customActionMenu
+              ) : (
+                <>
+                  {onDelete && (
+                    <Card.ActionIcon
+                      data-action-icon
+                      isDelete
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onDelete();
+                      }}
+                    >
+                      <Trash />
+                    </Card.ActionIcon>
+                  )}
+                </>
+              )}
+            </div>
+            {expandable && onExpandedChange !== undefined && (
+              <div className={styles.actionsBottom}>
                 <Card.ActionIcon
                   data-action-icon
                   onClick={(e) => {
@@ -375,44 +423,9 @@ export default function ClassCard({
                     <ArrowSeparateVertical />
                   )}
                 </Card.ActionIcon>
-              )}
-            </Card.Footer>
+              </div>
+            )}
           </div>
-        </Card.Body>
-        {(onUnlock || customActionMenu || onDelete) && (
-          <Card.Actions data-actions>
-            {onUnlock && (
-              <Card.ActionIcon
-                data-action-icon
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onUnlock();
-                }}
-              >
-                <Lock />
-              </Card.ActionIcon>
-            )}
-            {customActionMenu ? (
-              customActionMenu
-            ) : (
-              <>
-                {onDelete && (
-                  <Card.ActionIcon
-                    data-action-icon
-                    isDelete
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onDelete();
-                    }}
-                  >
-                    <Trash />
-                  </Card.ActionIcon>
-                )}
-              </>
-            )}
-          </Card.Actions>
         )}
       </Card.ColumnHeader>
       {expanded && <Card.ColumnBody>{children}</Card.ColumnBody>}

@@ -13,6 +13,7 @@ import { Badge, Box, Container, Flex } from "@repo/theme";
 
 import Details from "@/components/Details";
 import useClass from "@/hooks/useClass";
+import { getDerivedFinalExam } from "@/lib/finalExam";
 import { DeCal, DeCalInstructor } from "@/lib/generated/graphql";
 import { linkify } from "@/utils/linkify";
 
@@ -61,11 +62,19 @@ const formatExamDate = (dateStr?: string | null): string | null => {
     const d = parseInt(dateStr.slice(6, 8), 10);
     date = new Date(y, m, d);
   } else {
-    date = new Date(dateStr);
+    // Parse ISO dates as local time; new Date("YYYY-MM-DD") is UTC
+    // midnight, which formats as the previous day in western timezones.
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+    date = match
+      ? new Date(
+          parseInt(match[1], 10),
+          parseInt(match[2], 10) - 1,
+          parseInt(match[3], 10)
+        )
+      : new Date(dateStr);
   }
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString("en-US", {
-    timeZone: "America/Los_Angeles",
     weekday: "long",
     month: "short",
     day: "numeric",
@@ -358,7 +367,11 @@ export default function Overview() {
               .filter((e) => e.type === "FIN")
               .filter((e) => e.date || e.startTime || e.endTime);
             const hasScheduledExams = finalExamsWithSchedule.length > 0;
-            if (!finalExamLabel && !hasScheduledExams) return null;
+            const derivedExam = hasScheduledExams
+              ? null
+              : getDerivedFinalExam(_class);
+            if (!finalExamLabel && !hasScheduledExams && !derivedExam)
+              return null;
             return (
               <Flex direction="column" gap="2">
                 <p className={styles.label}>Final Exam</p>
@@ -384,6 +397,22 @@ export default function Overview() {
                         </span>
                       );
                     })}
+                  {derivedExam &&
+                    (() => {
+                      const dateStr = formatExamDate(derivedExam.date);
+                      const timeStr = formatExamTime(
+                        derivedExam.startTime,
+                        derivedExam.endTime
+                      );
+                      if (!dateStr || !timeStr) return null;
+                      return (
+                        <span>
+                          {finalExamLabel ? <br /> : null}
+                          {dateStr} · {timeStr} (estimated from the{" "}
+                          {_class.semester} {_class.year} final exam schedule)
+                        </span>
+                      );
+                    })()}
                 </p>
               </Flex>
             );

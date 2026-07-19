@@ -20,9 +20,11 @@ import ClassDrawer from "@/components/ClassDrawer";
 import { ColorDot } from "@/components/ColorDot";
 import { IScheduleClass, componentMap } from "@/lib/api";
 import { capitalizeColor } from "@/lib/colors";
+import { ResolvedFinalExam } from "@/lib/finalExam";
 import { Color, Component, Semester } from "@/lib/generated/graphql";
 
 import styles from "./Class.module.scss";
+import FinalExamChip from "./FinalExamChip";
 import Section from "./Section";
 import TimeSlotGroup, {
   groupSectionsByMeetingTime,
@@ -42,6 +44,8 @@ interface ClassProps {
   blockedSections?: IScheduleClass["blockedSections"];
   lockedComponents?: Component[];
   selectedSections: IScheduleClass["selectedSections"];
+  finalExam?: ResolvedFinalExam | null;
+  finalExamConflicts?: string[];
   onSectionSelect: (
     subject: string,
     courseNumber: string,
@@ -111,6 +115,8 @@ export default function Class({
   blockedSections = [],
   lockedComponents = [],
   selectedSections,
+  finalExam = null,
+  finalExamConflicts = [],
   onSectionSelect,
   onSectionMouseOver,
   onSectionMouseOut,
@@ -279,6 +285,12 @@ export default function Class({
           customActionMenu={
             editing ? <ActionMenu menuItems={menuItems} asIcon /> : undefined
           }
+          infoContent={
+            finalExam ? (
+              <FinalExamChip exam={finalExam} conflicts={finalExamConflicts} />
+            ) : undefined
+          }
+          singleLineInfo
           wrapDescription={true}
           onUnlock={
             locked

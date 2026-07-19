@@ -304,6 +304,7 @@ export const GET_CLASS_DETAILS = gql`
       primarySection {
         sectionId
         component
+        instructionMode
         sectionAttributes(attributeCode: "NOTE") {
           attribute {
             code
