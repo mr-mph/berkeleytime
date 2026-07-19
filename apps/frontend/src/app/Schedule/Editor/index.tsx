@@ -205,6 +205,125 @@ export default function Editor() {
     [schedule, updateSchedule]
   );
 
+  const handleSiblingLectureSelect = useCallback(
+    async (
+      subject: string,
+      courseNumber: string,
+      fromClassNumber: string,
+      toClassNumber: string
+    ) => {
+      if (fromClassNumber === toClassNumber) return;
+
+      const selectedClassIndex = schedule.classes.findIndex(
+        (selectedClass) =>
+          selectedClass.class.subject === subject &&
+          selectedClass.class.courseNumber === courseNumber &&
+          selectedClass.class.number === fromClassNumber
+      );
+      if (selectedClassIndex < 0) return;
+
+      const existingSibling = schedule.classes.find(
+        (selectedClass) =>
+          selectedClass.class.subject === subject &&
+          selectedClass.class.courseNumber === courseNumber &&
+          selectedClass.class.number === toClassNumber
+      );
+      // Already have this lecture listing on the schedule — don't create a duplicate
+      if (existingSibling) return;
+
+      const { data } = await apolloClient.query({
+        query: GetClassDocument,
+        variables: {
+          year: schedule.year,
+          semester: schedule.semester,
+          sessionId: schedule.sessionId,
+          subject,
+          courseNumber,
+          number: toClassNumber,
+        },
+      });
+
+      if (!data?.class) return;
+
+      const _classClone = structuredClone(data.class);
+      const _class = {
+        ..._classClone,
+        primarySection: _classClone.primarySection
+          ? {
+              ..._classClone.primarySection,
+              subject: _classClone.subject,
+              courseNumber: _classClone.courseNumber,
+              classNumber: _classClone.number,
+            }
+          : undefined,
+        sections: _classClone.sections.map((s) => ({
+          ...s,
+          subject: _classClone.subject,
+          courseNumber: _classClone.courseNumber,
+          classNumber: _classClone.number,
+        })),
+        siblingPrimarySections: (_classClone.siblingPrimarySections ?? []).map(
+          (s) => ({
+            ...s,
+            subject: _classClone.subject,
+            courseNumber: _classClone.courseNumber,
+            classNumber: _classClone.number,
+          })
+        ),
+      } as unknown as IScheduleClass["class"];
+
+      const previous = schedule.classes[selectedClassIndex];
+      const _schedule = structuredClone(schedule);
+      _schedule.classes[selectedClassIndex] = {
+        class: _class,
+        selectedSections: _class.primarySection
+          ? [{ ..._class.primarySection }]
+          : [],
+        color: previous.color,
+        hidden: previous.hidden ?? false,
+        locked: previous.locked ?? false,
+        blockedSections: [],
+        lockedComponents: [],
+      };
+
+      setCurrentSection(null);
+
+      updateSchedule(
+        schedule._id,
+        {
+          classes: _schedule.classes.map(
+            ({
+              selectedSections,
+              class: { number, subject, courseNumber },
+              color,
+              hidden,
+              locked,
+              blockedSections,
+              lockedComponents,
+            }) => ({
+              subject,
+              courseNumber,
+              number,
+              sectionIds: selectedSections.map((s) => s.sectionId),
+              color,
+              hidden,
+              locked,
+              blockedSections,
+              lockedComponents,
+            })
+          ),
+        },
+        {
+          optimisticResponse: {
+            __typename: "Mutation",
+            updateSchedule: _schedule,
+          },
+        }
+      );
+    },
+    [apolloClient, schedule, updateSchedule]
+  );
+
   const handleSectionMouseOver = useCallback(
     (
       subject: string,
@@ -224,9 +343,12 @@ export default function Editor() {
       const section =
         selectedClass.class.primarySection?.number === number
           ? selectedClass.class.primarySection
-          : selectedClass.class.sections.find(
+          : (selectedClass.class.siblingPrimarySections?.find(
+              (sibling) => sibling.number === number
+            ) ??
+            selectedClass.class.sections.find(
               (section) => section.number === number
-            );
+            ));
 
       if (!section) return;
 
@@ -421,7 +543,7 @@ export default function Editor() {
 
       const _classClone = structuredClone(data.class);
 
-      const _class: IScheduleClass["class"] = {
+      const _class = {
         ..._classClone,
         primarySection: _classClone.primarySection
           ? {
@@ -439,7 +561,15 @@ export default function Editor() {
             classNumber: _classClone.number,
           };
         }),
-      };
+        siblingPrimarySections: (
+          _classClone.siblingPrimarySections ?? []
+        ).map((s) => ({
+          ...s,
+          subject: _classClone.subject,
+          courseNumber: _classClone.courseNumber,
+          classNumber: _classClone.number,
+        })),
+      } as unknown as IScheduleClass["class"];
 
       const selectedSections = [_class.primarySection];
 
@@ -1250,6 +1380,7 @@ export default function Editor() {
             expanded={expanded}
             onClassSelect={handleClassSelect}
             onSectionSelect={handleSectionSelect}
+            onSiblingLectureSelect={handleSiblingLectureSelect}
             onExpandedChange={handleExpandedChange}
             onSectionMouseOver={handleSectionMouseOver}
             onSectionMouseOut={() => setCurrentSection(null)}

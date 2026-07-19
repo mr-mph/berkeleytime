@@ -276,14 +276,19 @@ export const finalExamsOverlap = (
   return aStart < bEnd && bStart < aEnd;
 };
 
-/** Format "YYYY-MM-DD" as e.g. "Mon 12/14" without timezone pitfalls. */
-export const formatFinalExamDate = (date: string): string | null => {
+/** Format "YYYY-MM-DD" as e.g. "Mon 12/14" (or "12/14" without weekday). */
+export const formatFinalExamDate = (
+  date: string,
+  options?: { includeWeekday?: boolean }
+): string | null => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) return null;
   const [, year, month, day] = match;
+  const md = `${Number(month)}/${Number(day)}`;
+  if (options?.includeWeekday === false) return md;
   const local = new Date(Number(year), Number(month) - 1, Number(day));
   const weekday = local.toLocaleDateString("en-US", { weekday: "short" });
-  return `${weekday} ${Number(month)}/${Number(day)}`;
+  return `${weekday} ${md}`;
 };
 
 /** Format "HH:MM(:SS)" start/end as e.g. "8–11 AM" or "11:30 AM–2:30 PM". */

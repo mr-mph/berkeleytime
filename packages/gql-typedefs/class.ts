@@ -61,6 +61,11 @@ export const classTypeDef = gql`
     term: Term!
     course: Course!
     primarySection: Section
+    """
+    Other primary sections for this course in the same term (e.g. lecture 002
+    when this class is lecture 001). Each is its own class listing.
+    """
+    siblingPrimarySections: [Section!]!
     sections: [Section!]!
     gradeDistribution: GradeDistribution!
     aggregatedRatings: AggregatedRatings!

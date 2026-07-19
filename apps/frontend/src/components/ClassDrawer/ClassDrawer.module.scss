@@ -1,3 +1,9 @@
+.overlay {
+  /* Keep dimming/click-outside without covering the top DEV banner strip. */
+  top: 36px;
+  pointer-events: auto;
+}
+
 .drawer {
   background-color: var(--background-color);
   width: 640px;

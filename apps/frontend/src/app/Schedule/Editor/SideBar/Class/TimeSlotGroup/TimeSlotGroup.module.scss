@@ -4,14 +4,6 @@
   gap: 12px;
   width: 100%;
 
-  &:hover:not(.blocked):not(.noHover) .title {
-    color: var(--heading-color);
-  }
-
-  &.active:not(.blocked) .title {
-    color: var(--heading-color);
-  }
-
   &.active:not(.blocked) .radioButton {
     border-color: var(--blue-500);
 

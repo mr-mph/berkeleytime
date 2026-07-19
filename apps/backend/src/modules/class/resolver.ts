@@ -20,6 +20,7 @@ import {
   getPrimarySection,
   getSecondarySections,
   getSection,
+  getSiblingPrimarySections,
   getViewCount,
   trackClassView,
 } from "./controller";
@@ -218,6 +219,35 @@ const resolvers: ClassModule.Resolvers = {
       }
 
       return primarySection as unknown as ClassModule.Section;
+    },
+
+    siblingPrimarySections: async (
+      parent: IntermediateClass | ClassModule.Class
+    ) => {
+      const sections = (parent.siblingPrimarySections ||
+        (await getSiblingPrimarySections(
+          parent.year,
+          parent.semester,
+          parent.sessionId,
+          parent.subject,
+          parent.courseNumber,
+          parent.number
+        ))) as (IntermediateSection | ClassModule.Section)[];
+
+      return sections.map((section) => {
+        const sectionWithRawData = section as SectionWithRawInstructors;
+        if (sectionWithRawData.meetings) {
+          const filteredSection: IntermediateSection = {
+            ...sectionWithRawData,
+            meetings: sectionWithRawData.meetings.map((meeting) => ({
+              ...meeting,
+              instructors: filterAndSortInstructors(meeting.instructors),
+            })),
+          };
+          return filteredSection as unknown as ClassModule.Section;
+        }
+        return section as unknown as ClassModule.Section;
+      });
     },
 
     sections: async (parent: IntermediateClass | ClassModule.Class) => {

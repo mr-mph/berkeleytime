@@ -13,6 +13,7 @@ interface ClassRelationships {
   term: null;
   course: null;
   primarySection: null;
+  siblingPrimarySections: null;
   sections: null;
   gradeDistribution: null;
   aggregatedRatings: null;
@@ -43,6 +44,7 @@ export const formatClass = (_class: IClassItem) => {
     term: null,
     course: null,
     primarySection: null,
+    siblingPrimarySections: null,
     sections: null,
     gradeDistribution: null,
     aggregatedRatings: null,

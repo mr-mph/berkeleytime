@@ -4,10 +4,19 @@ import { Eye, EyeClosed } from "iconoir-react";
 import { Tooltip } from "@repo/theme";
 
 import CCN from "@/components/CCN";
+import {
+  getEnrollmentColor,
+  getEnrollmentHoverLabel,
+} from "@/components/Capacity";
 import Time from "@/components/Time";
 import { IScheduleClass } from "@/lib/api";
 
 import styles from "./Section.module.scss";
+
+type ScheduleSection = NonNullable<
+  IScheduleClass["class"]["sections"]
+>[number];
+type PrimarySection = NonNullable<IScheduleClass["class"]["primarySection"]>;
 
 interface SectionProps {
   onSectionSelect?: () => void;
@@ -18,6 +27,10 @@ interface SectionProps {
   blocked?: boolean;
   editing?: boolean;
   showCcn?: boolean;
+  sectionId: ScheduleSection["sectionId"] | PrimarySection["sectionId"];
+  number: ScheduleSection["number"] | PrimarySection["number"];
+  meetings: ScheduleSection["meetings"] | PrimarySection["meetings"];
+  enrollment?: ScheduleSection["enrollment"] | PrimarySection["enrollment"];
 }
 
 export default function Section({
@@ -32,8 +45,22 @@ export default function Section({
   sectionId,
   number,
   meetings,
-}: SectionProps & IScheduleClass["class"]["primarySection"]) {
+  enrollment,
+}: SectionProps) {
   const meetingsAdjusted = meetings.length > 0 ? meetings : [null];
+  const enrolledCount = enrollment?.latest?.enrolledCount;
+  const maxEnroll = enrollment?.latest?.maxEnroll;
+  const waitlistedCount = enrollment?.latest?.waitlistedCount;
+  const enrollmentColor = getEnrollmentColor(
+    enrolledCount ?? undefined,
+    maxEnroll ?? undefined
+  );
+  const enrollmentHoverLabel = getEnrollmentHoverLabel(
+    enrolledCount,
+    maxEnroll,
+    waitlistedCount
+  );
+
   return meetingsAdjusted.map((meeting) => (
     <div
       className={classNames(styles.root, {
@@ -51,7 +78,18 @@ export default function Section({
       onMouseOut={() => !blocked && onSectionMouseOut()}
     >
       <div className={styles.radioButton} />
-      <p className={styles.title}>{number}</p>
+      {enrollmentHoverLabel ? (
+        <Tooltip
+          trigger={
+            <p className={styles.title} style={{ color: enrollmentColor }}>
+              {number}
+            </p>
+          }
+          title={enrollmentHoverLabel}
+        />
+      ) : (
+        <p className={styles.title}>{number}</p>
+      )}
       {showCcn && <CCN sectionId={sectionId} tooltip={false} />}
       <Time
         endTime={meeting?.endTime ?? null}

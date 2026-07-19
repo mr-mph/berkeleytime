@@ -45,10 +45,10 @@ export default function ClassDrawer({
   onOpenChange,
 }: ClassDrawerProps) {
   return (
-    <Dialog.Root onOpenChange={onOpenChange} open={open}>
+    <Dialog.Root modal={false} onOpenChange={onOpenChange} open={open}>
       {children && <Dialog.Trigger asChild>{children}</Dialog.Trigger>}
       <Dialog.Portal>
-        <Dialog.Overlay />
+        <Dialog.Overlay className={styles.overlay} />
         <Dialog.Drawer className={styles.drawer}>
           <Class
             subject={subject}

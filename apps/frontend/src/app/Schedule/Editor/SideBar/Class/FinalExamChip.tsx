@@ -18,9 +18,10 @@ interface FinalExamChipProps {
 }
 
 export default function FinalExamChip({ exam, conflicts }: FinalExamChipProps) {
-  const date = formatFinalExamDate(exam.date);
+  const dateShort = formatFinalExamDate(exam.date, { includeWeekday: false });
+  const dateFull = formatFinalExamDate(exam.date);
   const time = formatFinalExamTime(exam.startTime, exam.endTime);
-  if (!date || !time) return null;
+  if (!dateShort || !dateFull || !time) return null;
 
   const hasConflict = conflicts.length > 0;
 
@@ -37,14 +38,14 @@ export default function FinalExamChip({ exam, conflicts }: FinalExamChipProps) {
           ) : (
             <Calendar className={styles.icon} />
           )}
-          {date}
+          {dateShort}
         </span>
       }
       title="Final Exam"
       description={
         <div className={styles.details}>
           <span>
-            {date} · {time}
+            {dateFull} · {time}
           </span>
           {exam.source === "sis" ? (
             exam.location && <span>{exam.location}</span>

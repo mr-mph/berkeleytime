@@ -172,6 +172,40 @@ export const GET_CLASS = gql`
           endTime
         }
       }
+      siblingPrimarySections {
+        number
+        sectionId
+        component
+        startDate
+        endDate
+        enrollment {
+          latest {
+            status
+            enrolledCount
+            maxEnroll
+            waitlistedCount
+            maxWaitlist
+            activeReservedMaxCount
+          }
+        }
+        meetings {
+          days
+          location
+          endTime
+          startTime
+          instructors {
+            familyName
+            givenName
+          }
+        }
+        exams {
+          date
+          type
+          location
+          startTime
+          endTime
+        }
+      }
       sections {
         number
         sectionId

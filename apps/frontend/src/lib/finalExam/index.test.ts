@@ -352,6 +352,9 @@ describe("formatting", () => {
   it("formats dates without timezone shifts", () => {
     expect(formatFinalExamDate("2026-12-14")).toBe("Mon 12/14");
     expect(formatFinalExamDate("2026-12-18")).toBe("Fri 12/18");
+    expect(formatFinalExamDate("2026-12-18", { includeWeekday: false })).toBe(
+      "12/18"
+    );
     expect(formatFinalExamDate("bogus")).toBeNull();
   });
 

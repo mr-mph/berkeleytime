@@ -1,9 +1,15 @@
+import { Fragment } from "react";
+
 import classNames from "classnames";
 import { Eye, EyeClosed } from "iconoir-react";
 import { HoverCard } from "radix-ui";
 
 import { Tooltip } from "@repo/theme";
 
+import {
+  getEnrollmentColor,
+  getEnrollmentHoverLabel,
+} from "@/components/Capacity";
 import Time from "@/components/Time";
 import { IScheduleClass } from "@/lib/api";
 
@@ -12,9 +18,11 @@ import styles from "./TimeSlotGroup.module.scss";
 type ScheduleSection = NonNullable<
   IScheduleClass["class"]["sections"]
 >[number];
+type PrimarySection = NonNullable<IScheduleClass["class"]["primarySection"]>;
+type GroupableSection = ScheduleSection | PrimarySection;
 
 interface TimeSlotGroupProps {
-  sections: ScheduleSection[];
+  sections: GroupableSection[];
   selectedSectionId?: number | null;
   blockedSectionIds: number[];
   editing?: boolean;
@@ -24,8 +32,25 @@ interface TimeSlotGroupProps {
   onBlockToggle?: (blocked: boolean) => void;
 }
 
-const getPrimaryMeeting = (section: ScheduleSection) =>
+const getPrimaryMeeting = (section: GroupableSection) =>
   section.meetings?.[0] ?? null;
+
+function getSectionEnrollment(section: GroupableSection) {
+  const enrolledCount = section.enrollment?.latest?.enrolledCount;
+  const maxEnroll = section.enrollment?.latest?.maxEnroll;
+  const waitlistedCount = section.enrollment?.latest?.waitlistedCount;
+  return {
+    color: getEnrollmentColor(
+      enrolledCount ?? undefined,
+      maxEnroll ?? undefined
+    ),
+    hoverLabel: getEnrollmentHoverLabel(
+      enrolledCount,
+      maxEnroll,
+      waitlistedCount
+    ),
+  };
+}
 
 export default function TimeSlotGroup({
   sections,
@@ -40,7 +65,6 @@ export default function TimeSlotGroup({
   if (sections.length === 0) return null;
 
   const meeting = getPrimaryMeeting(sections[0]);
-  const numbersLabel = sections.map((section) => section.number).join(", ");
   const selectedSection =
     sections.find((section) => section.sectionId === selectedSectionId) ?? null;
   const allBlocked = sections.every((section) =>
@@ -84,7 +108,17 @@ export default function TimeSlotGroup({
             }}
           >
             <div className={styles.radioButton} />
-            <p className={styles.title}>{numbersLabel}</p>
+            <p className={styles.title}>
+              {sections.map((section, index) => {
+                const { color } = getSectionEnrollment(section);
+                return (
+                  <span key={section.sectionId}>
+                    {index > 0 && ", "}
+                    <span style={{ color }}>{section.number}</span>
+                  </span>
+                );
+              })}
+            </p>
             <Time
               endTime={meeting?.endTime ?? null}
               startTime={meeting?.startTime ?? null}
@@ -106,9 +140,9 @@ export default function TimeSlotGroup({
               const sectionMeeting = getPrimaryMeeting(section);
               const blocked = blockedSectionIds.includes(section.sectionId);
               const selected = section.sectionId === selectedSectionId;
-              return (
+              const { color, hoverLabel } = getSectionEnrollment(section);
+              const option = (
                 <button
-                  key={section.sectionId}
                   type="button"
                   className={classNames(styles.option, {
                     [styles.selected]: selected,
@@ -126,11 +160,26 @@ export default function TimeSlotGroup({
                     if (!blocked && editing) onSectionMouseOut();
                   }}
                 >
-                  <span className={styles.optionNumber}>{section.number}</span>
+                  <span className={styles.optionNumber} style={{ color }}>
+                    {section.number}
+                  </span>
                   <span className={styles.optionLocation}>
                     {sectionMeeting?.location?.trim() || "Location TBD"}
                   </span>
                 </button>
+              );
+
+              if (!hoverLabel) {
+                return <Fragment key={section.sectionId}>{option}</Fragment>;
+              }
+
+              return (
+                <Tooltip
+                  key={section.sectionId}
+                  trigger={option}
+                  title={hoverLabel}
+                  side="left"
+                />
               );
             })}
           </HoverCard.Content>
@@ -166,7 +215,7 @@ export default function TimeSlotGroup({
   );
 }
 
-export function getSectionMeetingKey(section: ScheduleSection): string {
+export function getSectionMeetingKey(section: GroupableSection): string {
   const meeting = getPrimaryMeeting(section);
   if (!meeting) return `unscheduled:${section.sectionId}`;
   const daysKey = (meeting.days ?? []).map((day) => (day ? "1" : "0")).join("");
@@ -174,9 +223,9 @@ export function getSectionMeetingKey(section: ScheduleSection): string {
 }
 
 export function groupSectionsByMeetingTime(
-  sections: ScheduleSection[]
-): ScheduleSection[][] {
-  const groups = new Map<string, ScheduleSection[]>();
+  sections: GroupableSection[]
+): GroupableSection[][] {
+  const groups = new Map<string, GroupableSection[]>();
   for (const section of sections) {
     const key = getSectionMeetingKey(section);
     const existing = groups.get(key);

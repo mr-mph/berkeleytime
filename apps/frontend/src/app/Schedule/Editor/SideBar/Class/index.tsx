@@ -52,6 +52,12 @@ interface ClassProps {
     classNumber: string,
     number: string
   ) => void;
+  onSiblingLectureSelect: (
+    subject: string,
+    courseNumber: string,
+    fromClassNumber: string,
+    toClassNumber: string
+  ) => void;
   onSectionMouseOver: (
     subject: string,
     courseNumber: string,
@@ -118,6 +124,7 @@ export default function Class({
   finalExam = null,
   finalExamConflicts = [],
   onSectionSelect,
+  onSiblingLectureSelect,
   onSectionMouseOver,
   onSectionMouseOut,
   onDelete,
@@ -136,15 +143,28 @@ export default function Class({
     return Object.groupBy(sortedSections, (section) => section.component);
   }, [_class]);
 
-  // Helper to count sections for a component (including primary section if it matches)
+  // Primary section plus sibling lectures from other class listings (e.g. 001 + 002)
+  const primarySections = useMemo(() => {
+    if (!_class.primarySection) return [];
+    const siblings = _class.siblingPrimarySections ?? [];
+    return [_class.primarySection, ...siblings].toSorted((a, b) =>
+      a.number.localeCompare(b.number)
+    );
+  }, [_class.primarySection, _class.siblingPrimarySections]);
+
+  // Helper to count sections for a component (including primary + sibling lectures)
   const getSectionCountForComponent = useCallback(
     (component: Component) => {
       const sectionsInGroup = groups[component] || [];
       const primaryMatches =
         _class.primarySection?.component === component ? 1 : 0;
-      return sectionsInGroup.length + primaryMatches;
+      const siblingMatches =
+        _class.primarySection?.component === component
+          ? (_class.siblingPrimarySections?.length ?? 0)
+          : 0;
+      return sectionsInGroup.length + primaryMatches + siblingMatches;
     },
-    [groups, _class.primarySection]
+    [groups, _class.primarySection, _class.siblingPrimarySections]
   );
 
   // Helper to get all section IDs for a component
@@ -168,9 +188,16 @@ export default function Class({
         sectionIds.push(_class.primarySection.sectionId);
       }
 
+      // Include sibling lectures so exclude-all covers every lecture option
+      if (_class.primarySection?.component === component) {
+        for (const sibling of _class.siblingPrimarySections ?? []) {
+          if (sibling?.sectionId) sectionIds.push(sibling.sectionId);
+        }
+      }
+
       return sectionIds;
     },
-    [groups, _class.primarySection]
+    [groups, _class.primarySection, _class.siblingPrimarySections]
   );
 
   // Helper to check if all sections in a component are blocked
@@ -198,6 +225,33 @@ export default function Class({
       return next;
     });
   }, []);
+
+  const handlePrimarySectionSelect = useCallback(
+    (sectionNumber: string) => {
+      if (sectionNumber === _class.number) {
+        onSectionSelect(
+          _class.subject,
+          _class.courseNumber,
+          _class.number,
+          sectionNumber
+        );
+        return;
+      }
+      onSiblingLectureSelect(
+        _class.subject,
+        _class.courseNumber,
+        _class.number,
+        sectionNumber
+      );
+    },
+    [
+      _class.subject,
+      _class.courseNumber,
+      _class.number,
+      onSectionSelect,
+      onSiblingLectureSelect,
+    ]
+  );
 
   // Color submenu
   const colorSubItems: MenuItem[] = acceptedColors.map((c) => ({
@@ -309,6 +363,11 @@ export default function Class({
               {_class.primarySection ? (
                 (() => {
                   const primaryComponent = _class.primarySection.component;
+                  const primarySectionCount =
+                    getSectionCountForComponent(primaryComponent);
+                  const groupByTime =
+                    groupByTimeComponents.has(primaryComponent);
+                  const canGroupByTime = primarySectionCount > 1;
                   return (
                     <>
                       <div className={styles.componentRow}>
@@ -349,8 +408,7 @@ export default function Class({
                                 : "Exclude All Sections"
                             }
                           />
-                          {getSectionCountForComponent(primaryComponent) >
-                            1 && (
+                          {primarySectionCount > 1 && (
                             <Tooltip
                               trigger={
                                 <button
@@ -385,6 +443,28 @@ export default function Class({
                               }
                             />
                           )}
+                          {canGroupByTime && (
+                            <Tooltip
+                              trigger={
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleGroupByTime(primaryComponent);
+                                  }}
+                                  className={`${styles.iconButton} ${groupByTime ? styles.locked : ""}`}
+                                  aria-pressed={groupByTime}
+                                >
+                                  <CompressLines width={16} height={16} />
+                                </button>
+                              }
+                              title={
+                                groupByTime
+                                  ? "Show individual sections"
+                                  : "Group by time"
+                              }
+                            />
+                          )}
                         </div>
                       </div>
                       <p className={styles.time}>Time</p>
@@ -398,62 +478,156 @@ export default function Class({
                 </>
               )}
             </div>
-            {_class.primarySection && (
-              <Section
-                active={selectedSections.some(
-                  (selectedSection) =>
-                    selectedSection.sectionId ===
-                    _class.primarySection?.sectionId
-                )}
-                blocked={
-                  blockedSections?.find(
-                    (s) => s === _class.primarySection?.sectionId
-                  )
-                    ? true
-                    : false
+            {_class.primarySection &&
+              (() => {
+                const primaryComponent = _class.primarySection.component;
+                const groupByTime =
+                  groupByTimeComponents.has(primaryComponent);
+                const timeGroups = groupByTime
+                  ? groupSectionsByMeetingTime(primarySections)
+                  : null;
+
+                if (timeGroups) {
+                  return timeGroups.map((slotSections) => {
+                    if (slotSections.length === 1) {
+                      const section = slotSections[0];
+                      const active = selectedSections.some(
+                        (selectedSection) =>
+                          selectedSection.sectionId === section.sectionId
+                      );
+                      const isBlocked = Boolean(
+                        blockedSections?.find((s) => s === section.sectionId)
+                      );
+                      return (
+                        <Section
+                          active={active}
+                          blocked={isBlocked}
+                          editing={editing}
+                          onBlockToggle={() => {
+                            onSectionBlockToggle(
+                              _class.subject,
+                              _class.courseNumber,
+                              _class.number,
+                              section.sectionId,
+                              !isBlocked
+                            );
+                          }}
+                          onSectionMouseOut={onSectionMouseOut}
+                          onSectionMouseOver={() =>
+                            onSectionMouseOver(
+                              _class.subject,
+                              _class.courseNumber,
+                              _class.number,
+                              section.number
+                            )
+                          }
+                          onSectionSelect={() =>
+                            handlePrimarySectionSelect(section.number)
+                          }
+                          {...section}
+                          key={section.sectionId}
+                        />
+                      );
+                    }
+
+                    const selectedInSlot = slotSections.find((section) =>
+                      selectedSections.some(
+                        (selected) => selected.sectionId === section.sectionId
+                      )
+                    );
+                    return (
+                      <TimeSlotGroup
+                        key={slotSections
+                          .map((section) => section.sectionId)
+                          .join("-")}
+                        sections={slotSections}
+                        selectedSectionId={selectedInSlot?.sectionId ?? null}
+                        blockedSectionIds={blockedSections ?? []}
+                        editing={editing}
+                        onSectionMouseOut={onSectionMouseOut}
+                        onSectionMouseOver={(sectionNumber) =>
+                          onSectionMouseOver(
+                            _class.subject,
+                            _class.courseNumber,
+                            _class.number,
+                            sectionNumber
+                          )
+                        }
+                        onSectionSelect={handlePrimarySectionSelect}
+                        onBlockToggle={(blocked) => {
+                          for (const section of slotSections) {
+                            const currentlyBlocked = Boolean(
+                              blockedSections?.find(
+                                (s) => s === section.sectionId
+                              )
+                            );
+                            if (currentlyBlocked === blocked) continue;
+                            onSectionBlockToggle(
+                              _class.subject,
+                              _class.courseNumber,
+                              _class.number,
+                              section.sectionId,
+                              blocked
+                            );
+                          }
+                        }}
+                      />
+                    );
+                  });
                 }
-                editing={editing}
-                onBlockToggle={() => {
-                  onSectionBlockToggle(
-                    _class.subject,
-                    _class.courseNumber,
-                    _class.number,
-                    _class.primarySection!.sectionId,
-                    !blockedSections?.find(
-                      (s) => s === _class.primarySection!.sectionId
-                    )
-                      ? true
-                      : false
+
+                return primarySections.map((section) => {
+                  const active = selectedSections.some(
+                    (selectedSection) =>
+                      selectedSection.sectionId === section.sectionId
                   );
-                }}
-                {..._class.primarySection}
-                onSectionMouseOver={() =>
-                  onSectionMouseOver(
-                    _class.subject,
-                    _class.courseNumber,
-                    _class.number,
-                    _class.primarySection?.number
-                  )
-                }
-                onSectionMouseOut={onSectionMouseOut}
-                onSectionSelect={() =>
-                  onSectionSelect(
-                    _class.subject,
-                    _class.courseNumber,
-                    _class.number,
-                    _class.primarySection?.number
-                  )
-                }
-              />
-            )}
+                  const isBlocked = Boolean(
+                    blockedSections?.find((s) => s === section.sectionId)
+                  );
+
+                  return (
+                    <Section
+                      active={active}
+                      blocked={isBlocked}
+                      editing={editing}
+                      onBlockToggle={() => {
+                        onSectionBlockToggle(
+                          _class.subject,
+                          _class.courseNumber,
+                          _class.number,
+                          section.sectionId,
+                          !isBlocked
+                        );
+                      }}
+                      {...section}
+                      onSectionMouseOver={() =>
+                        onSectionMouseOver(
+                          _class.subject,
+                          _class.courseNumber,
+                          _class.number,
+                          section.number
+                        )
+                      }
+                      onSectionMouseOut={onSectionMouseOut}
+                      onSectionSelect={() =>
+                        handlePrimarySectionSelect(section.number)
+                      }
+                      key={section.sectionId}
+                    />
+                  );
+                });
+              })()}
           </div>
-          {Object.keys(groups).map((component) => {
+          {Object.keys(groups)
+            .filter(
+              (component) => component !== _class.primarySection?.component
+            )
+            .map((component) => {
             const group = component as Component;
             const isLocked = lockedComponents.includes(group);
             const sectionCount = getSectionCountForComponent(group);
             const groupByTime = groupByTimeComponents.has(group);
-            const canGroupByTime =
-              group !== _class.primarySection?.component && sectionCount > 1;
+            const canGroupByTime = sectionCount > 1;
             const sectionList = groups[group] ?? [];
             const timeGroups = groupByTime
               ? groupSectionsByMeetingTime(sectionList)

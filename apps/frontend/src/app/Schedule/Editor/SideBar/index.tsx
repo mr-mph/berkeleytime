@@ -32,6 +32,12 @@ interface SideBarProps {
     classNumber: string,
     number: string
   ) => void;
+  onSiblingLectureSelect: (
+    subject: string,
+    courseNumber: string,
+    fromClassNumber: string,
+    toClassNumber: string
+  ) => void;
   onSectionMouseOver: (
     subject: string,
     courseNumber: string,
@@ -90,6 +96,7 @@ export default function SideBar({
   onClassSelect,
   expanded,
   onSectionSelect,
+  onSiblingLectureSelect,
   onSectionMouseOver,
   onSectionMouseOut,
   onExpandedChange,
@@ -225,6 +232,7 @@ export default function SideBar({
               onExpandedChange={(expanded) => onExpandedChange(index, expanded)}
               editing={editing}
               onSectionSelect={onSectionSelect}
+              onSiblingLectureSelect={onSiblingLectureSelect}
               onSectionMouseOver={onSectionMouseOver}
               onSectionMouseOut={onSectionMouseOut}
               onDelete={onDeleteClass}

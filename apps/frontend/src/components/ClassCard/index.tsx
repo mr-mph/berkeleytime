@@ -289,19 +289,20 @@ export default function ClassCard({
                         unitsMax={_class.unitsMax}
                       />
                     )}
-                  {(_class?.primarySection?.enrollment?.latest
-                    ?.activeReservedMaxCount ?? 0) > 0 && (
-                    <Tooltip
-                      trigger={
-                        <span className={styles.reservedSeating}>
-                          <InfoCircle className={styles.reservedSeatingIcon} />
-                          Rsvd
-                        </span>
-                      }
-                      title="Reserved Seating"
-                      description={`${activeReservedMaxCount.toLocaleString()} out of ${maxEnroll.toLocaleString()} seats for this class are reserved.`}
-                    />
-                  )}
+                  {!singleLineInfo &&
+                    (_class?.primarySection?.enrollment?.latest
+                      ?.activeReservedMaxCount ?? 0) > 0 && (
+                      <Tooltip
+                        trigger={
+                          <span className={styles.reservedSeating}>
+                            <InfoCircle className={styles.reservedSeatingIcon} />
+                            Rsvd
+                          </span>
+                        }
+                        title="Reserved Seating"
+                        description={`${activeReservedMaxCount.toLocaleString()} out of ${maxEnroll.toLocaleString()} seats for this class are reserved.`}
+                      />
+                    )}
                   {ratingsCount > 0 && (
                     <Tooltip
                       trigger={

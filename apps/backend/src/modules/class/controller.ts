@@ -89,6 +89,30 @@ export const getSecondarySections = async (
   return sections.map((section) => formatSection(section as ISectionItem));
 };
 
+export const getSiblingPrimarySections = async (
+  year: number,
+  semester: string,
+  sessionId: string,
+  subject: string,
+  courseNumber: string,
+  number: string
+) => {
+  const sections = await SectionModel.find({
+    year,
+    semester,
+    sessionId,
+    subject,
+    courseNumber,
+    primary: true,
+    number: { $ne: number },
+    printInScheduleOfClasses: true,
+  })
+    .sort({ number: 1 })
+    .lean();
+
+  return sections.map((section) => formatSection(section as ISectionItem));
+};
+
 export const getPrimarySection = async (
   year: number,
   semester: string,

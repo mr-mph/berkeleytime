@@ -84,6 +84,45 @@ export const READ_SCHEDULE = gql`
                 maxEnroll
                 waitlistedCount
                 maxWaitlist
+                activeReservedMaxCount
+              }
+            }
+            meetings {
+              days
+              location
+              endTime
+              startTime
+              instructors {
+                familyName
+                givenName
+              }
+            }
+            exams {
+              date
+              type
+              location
+              startTime
+              endTime
+            }
+          }
+          siblingPrimarySections {
+            sectionId
+            subject
+            courseNumber
+            classNumber
+            number
+            startDate
+            endDate
+            component
+            instructionMode
+            enrollment {
+              latest {
+                status
+                enrolledCount
+                maxEnroll
+                waitlistedCount
+                maxWaitlist
+                activeReservedMaxCount
               }
             }
             meetings {
@@ -120,6 +159,7 @@ export const READ_SCHEDULE = gql`
                 maxEnroll
                 waitlistedCount
                 maxWaitlist
+                activeReservedMaxCount
               }
             }
             meetings {
@@ -215,6 +255,45 @@ export const UPDATE_SCHEDULE = gql`
                 maxEnroll
                 waitlistedCount
                 maxWaitlist
+                activeReservedMaxCount
+              }
+            }
+            meetings {
+              days
+              location
+              endTime
+              startTime
+              instructors {
+                familyName
+                givenName
+              }
+            }
+            exams {
+              date
+              type
+              location
+              startTime
+              endTime
+            }
+          }
+          siblingPrimarySections {
+            sectionId
+            subject
+            courseNumber
+            classNumber
+            number
+            startDate
+            endDate
+            component
+            instructionMode
+            enrollment {
+              latest {
+                status
+                enrolledCount
+                maxEnroll
+                waitlistedCount
+                maxWaitlist
+                activeReservedMaxCount
               }
             }
             meetings {
@@ -251,6 +330,7 @@ export const UPDATE_SCHEDULE = gql`
                 maxEnroll
                 waitlistedCount
                 maxWaitlist
+                activeReservedMaxCount
               }
             }
             meetings {
@@ -352,6 +432,45 @@ export const CREATE_SCHEDULE = gql`
                 maxEnroll
                 waitlistedCount
                 maxWaitlist
+                activeReservedMaxCount
+              }
+            }
+            meetings {
+              days
+              location
+              endTime
+              startTime
+              instructors {
+                familyName
+                givenName
+              }
+            }
+            exams {
+              date
+              type
+              location
+              startTime
+              endTime
+            }
+          }
+          siblingPrimarySections {
+            sectionId
+            subject
+            courseNumber
+            classNumber
+            number
+            startDate
+            endDate
+            component
+            instructionMode
+            enrollment {
+              latest {
+                status
+                enrolledCount
+                maxEnroll
+                waitlistedCount
+                maxWaitlist
+                activeReservedMaxCount
               }
             }
             meetings {
@@ -388,6 +507,7 @@ export const CREATE_SCHEDULE = gql`
                 maxEnroll
                 waitlistedCount
                 maxWaitlist
+                activeReservedMaxCount
               }
             }
             meetings {
