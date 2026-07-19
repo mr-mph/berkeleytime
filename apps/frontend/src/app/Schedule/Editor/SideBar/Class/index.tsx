@@ -290,6 +290,7 @@ export default function Class({
               <FinalExamChip exam={finalExam} conflicts={finalExamConflicts} />
             ) : undefined
           }
+          singleLineInfo
           wrapDescription={true}
           onUnlock={
             locked

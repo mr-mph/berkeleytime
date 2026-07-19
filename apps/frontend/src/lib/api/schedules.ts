@@ -55,6 +55,8 @@ export const READ_SCHEDULE = gql`
           unitsMax
           unitsMin
           finalExam
+          rmpAverageRating
+          rmpMatchedInstructorCount
           course {
             title
             gradeDistribution {
@@ -184,6 +186,8 @@ export const UPDATE_SCHEDULE = gql`
           unitsMax
           unitsMin
           finalExam
+          rmpAverageRating
+          rmpMatchedInstructorCount
           course {
             title
             gradeDistribution {
@@ -319,6 +323,8 @@ export const CREATE_SCHEDULE = gql`
           unitsMax
           unitsMin
           finalExam
+          rmpAverageRating
+          rmpMatchedInstructorCount
           course {
             title
             gradeDistribution {
