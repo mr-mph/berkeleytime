@@ -12,6 +12,7 @@
 - see ratemyprofesor ratings for each prof next to their name and a link to their rmp profile
 - see ASSIST transfer equivalents at community colleges
 - see final exam time and date
+- get live enrollment info with refresh button
 
 ### scheduler:
 - allow grouping together of labs/discussions that share a timeslot in picker
@@ -25,6 +26,7 @@
 - fix enrollment info for individual sections not showing on crosslistings of courses
 - fix the grades tab link to grades full page view
 - fix rating count inconsistencies across card, tab badge, and tab content
+- fix scrolling of course listing while in scheduler
 
 
 # Berkeleytime
