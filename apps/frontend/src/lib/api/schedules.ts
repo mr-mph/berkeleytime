@@ -54,6 +54,7 @@ export const READ_SCHEDULE = gql`
           number
           unitsMax
           unitsMin
+          finalExam
           course {
             title
             gradeDistribution {
@@ -73,6 +74,7 @@ export const READ_SCHEDULE = gql`
             startDate
             endDate
             component
+            instructionMode
             enrollment {
               latest {
                 status
@@ -181,6 +183,7 @@ export const UPDATE_SCHEDULE = gql`
           number
           unitsMax
           unitsMin
+          finalExam
           course {
             title
             gradeDistribution {
@@ -200,6 +203,7 @@ export const UPDATE_SCHEDULE = gql`
             startDate
             endDate
             component
+            instructionMode
             enrollment {
               latest {
                 status
@@ -314,6 +318,7 @@ export const CREATE_SCHEDULE = gql`
           number
           unitsMax
           unitsMin
+          finalExam
           course {
             title
             gradeDistribution {
@@ -333,6 +338,7 @@ export const CREATE_SCHEDULE = gql`
             startDate
             endDate
             component
+            instructionMode
             enrollment {
               latest {
                 status

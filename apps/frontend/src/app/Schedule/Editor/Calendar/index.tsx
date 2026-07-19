@@ -11,11 +11,21 @@ import styles from "./Calendar.module.scss";
 import Week from "./Week";
 import { IDay, IEvent } from "./calendar";
 
+export interface DerivedExamEvent {
+  subject: string;
+  courseNumber: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  color: Color;
+}
+
 interface CalendarProps {
   selectedSections: SectionColor[];
   currentSection: SectionColor | null;
   term: ISchedule["term"];
   customEvents?: IScheduleEvent[];
+  derivedExams?: DerivedExamEvent[];
 }
 
 export default function Calendar({
@@ -23,6 +33,7 @@ export default function Calendar({
   currentSection,
   term,
   customEvents = [],
+  derivedExams = [],
 }: CalendarProps) {
   const [first] = useState(() => moment(term.startDate));
   const [last] = useState(() => moment(term.endDate));
@@ -101,6 +112,19 @@ export default function Calendar({
       return events;
     }, [] as IEvent[]);
 
+    // Add final exams estimated from the registrar's calendar
+    const derivedExamItems: IEvent[] = derivedExams.map((exam) => ({
+      date: exam.date,
+      subject: exam.subject,
+      number: exam.courseNumber,
+      active: false,
+      startTime: exam.startTime,
+      endTime: exam.endTime,
+      startDate: term.startDate || "",
+      endDate: term.endDate || "",
+      color: exam.color,
+    }));
+
     // Add custom events
     const customEventItems: IEvent[] = customEvents.map((event) => ({
       startDate: term.startDate || "",
@@ -114,8 +138,8 @@ export default function Calendar({
       color: event.color ?? Color.Gray,
     }));
 
-    return [...sectionEvents, ...customEventItems];
-  }, [selectedSections, currentSection, customEvents, term]);
+    return [...sectionEvents, ...derivedExamItems, ...customEventItems];
+  }, [selectedSections, currentSection, customEvents, derivedExams, term]);
 
   const weeks = useMemo(() => {
     const weeks: IDay[][] = [];
