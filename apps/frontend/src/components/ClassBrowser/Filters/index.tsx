@@ -51,6 +51,7 @@ export default function Filters() {
     updateUnits,
     levels,
     updateLevels,
+    days,
     updateDays,
     timeRange,
     updateTimeRange,
@@ -78,10 +79,30 @@ export default function Filters() {
 
   const navigate = useNavigate();
 
-  const [daysArray, setDaysArray] = useState<boolean[]>(() => [...EMPTY_DAYS]);
+  const daysFromFilters = useMemo(() => {
+    const next = [...EMPTY_DAYS];
+    for (const day of days) {
+      const index = Number(day);
+      if (Number.isInteger(index) && index >= 0 && index < next.length) {
+        next[index] = true;
+      }
+    }
+    return next;
+  }, [days]);
+
+  const [daysArray, setDaysArray] = useState<boolean[]>(daysFromFilters);
   const [activeRequirementTab, setActiveRequirementTab] = useState<string>(
     REQUIREMENT_TABS.LS
   );
+
+  // Keep local DaySelect state in sync when filters are cleared/restored.
+  useEffect(() => {
+    setDaysArray((prev) =>
+      prev.every((value, index) => value === daysFromFilters[index])
+        ? prev
+        : daysFromFilters
+    );
+  }, [daysFromFilters]);
 
   useEffect(() => {
     const newDays = daysArray.reduce((acc, v, i) => {
@@ -270,31 +291,33 @@ export default function Filters() {
             <span>Close Filters</span>
           </Button>
         )}
-        <div className={styles.formControl}>
-          <p className={styles.label}>Semester</p>
-          <Select
-            searchable
-            disabled={!terms || terms.length === 0}
-            value={currentTermLabel}
-            onChange={(value) => {
-              const selectedTerm = availableTerms.find(
-                (term) => `${term.semester} ${term.year}` === value
-              );
-              if (selectedTerm) {
-                navigate(
-                  `/catalog/${selectedTerm.year}/${selectedTerm.semester}`
+        {mode === "full" && (
+          <div className={styles.formControl}>
+            <p className={styles.label}>Semester</p>
+            <Select
+              searchable
+              disabled={!terms || terms.length === 0}
+              value={currentTermLabel}
+              onChange={(value) => {
+                const selectedTerm = availableTerms.find(
+                  (term) => `${term.semester} ${term.year}` === value
                 );
-              }
-            }}
-            options={availableTerms.map((term) => ({
-              value: `${term.semester} ${term.year}`,
-              label: `${term.semester} ${term.year}`,
-            }))}
-            searchPlaceholder="Search semesters..."
-            emptyMessage="No semesters found."
-            maxListHeight={130}
-          />
-        </div>
+                if (selectedTerm) {
+                  navigate(
+                    `/catalog/${selectedTerm.year}/${selectedTerm.semester}`
+                  );
+                }
+              }}
+              options={availableTerms.map((term) => ({
+                value: `${term.semester} ${term.year}`,
+                label: `${term.semester} ${term.year}`,
+              }))}
+              searchPlaceholder="Search semesters..."
+              emptyMessage="No semesters found."
+              maxListHeight={130}
+            />
+          </div>
+        )}
         <div className={styles.formControl}>
           <p className={styles.label}>Sort By</p>
           <div className={styles.sortControls}>

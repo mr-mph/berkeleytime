@@ -11,7 +11,9 @@ import List from "./List";
 import { FilterContext } from "./context/FilterContext";
 import { type CatalogLayoutMode, LayoutContext } from "./context/LayoutContext";
 import { ListContext } from "./context/ListContext";
-import useCatalogBrowser from "./hooks/useCatalogBrowser";
+import useCatalogBrowser, {
+  type UseCatalogBrowserReturn,
+} from "./hooks/useCatalogBrowser";
 
 interface ClassBrowserProps {
   onSelect: (
@@ -25,25 +27,29 @@ interface ClassBrowserProps {
   year: number;
   terms?: ITerm[];
   persistent?: boolean;
+  /** When provided, filter/search state is owned by the parent (survives unmount). */
+  browser?: UseCatalogBrowserReturn;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
-export default function ClassBrowser({
+function ClassBrowserView({
   onSelect,
   forceMode = "full",
   semester,
   year,
-  terms,
-  persistent,
-}: ClassBrowserProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  const browser = useCatalogBrowser({
-    year,
-    semester,
-    terms,
-    persistent,
-  });
-
+  browser,
+  expanded,
+  onExpandedChange,
+}: {
+  onSelect: ClassBrowserProps["onSelect"];
+  forceMode?: CatalogLayoutMode;
+  semester: Semester;
+  year: number;
+  browser: UseCatalogBrowserReturn;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+}) {
   return (
     <FilterContext value={browser.filters}>
       <ListContext value={browser.list}>
@@ -51,7 +57,7 @@ export default function ClassBrowser({
           value={{
             mode: forceMode,
             expanded,
-            setExpanded,
+            setExpanded: onExpandedChange,
             query: browser.query,
             updateQuery: browser.updateQuery,
             hasActiveFilters: browser.hasActiveFilters,
@@ -79,3 +85,69 @@ export default function ClassBrowser({
     </FilterContext>
   );
 }
+
+function ClassBrowserOwned({
+  onSelect,
+  forceMode = "full",
+  semester,
+  year,
+  terms,
+  persistent,
+  expanded: controlledExpanded,
+  onExpandedChange,
+}: Omit<ClassBrowserProps, "browser">) {
+  const browser = useCatalogBrowser({
+    year,
+    semester,
+    terms,
+    persistent,
+  });
+  const [uncontrolledExpanded, setUncontrolledExpanded] = useState(false);
+  const expanded = controlledExpanded ?? uncontrolledExpanded;
+  const setExpanded = onExpandedChange ?? setUncontrolledExpanded;
+
+  return (
+    <ClassBrowserView
+      onSelect={onSelect}
+      forceMode={forceMode}
+      semester={semester}
+      year={year}
+      browser={browser}
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+    />
+  );
+}
+
+export default function ClassBrowser({
+  browser,
+  expanded,
+  onExpandedChange,
+  ...props
+}: ClassBrowserProps) {
+  const [uncontrolledExpanded, setUncontrolledExpanded] = useState(false);
+
+  if (browser) {
+    return (
+      <ClassBrowserView
+        onSelect={props.onSelect}
+        forceMode={props.forceMode}
+        semester={props.semester}
+        year={props.year}
+        browser={browser}
+        expanded={expanded ?? uncontrolledExpanded}
+        onExpandedChange={onExpandedChange ?? setUncontrolledExpanded}
+      />
+    );
+  }
+
+  return (
+    <ClassBrowserOwned
+      {...props}
+      expanded={expanded}
+      onExpandedChange={onExpandedChange}
+    />
+  );
+}
+
+export type { UseCatalogBrowserReturn };

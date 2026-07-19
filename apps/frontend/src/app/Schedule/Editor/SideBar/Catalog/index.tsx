@@ -1,11 +1,11 @@
 import { ReactNode, useState } from "react";
 
 import { Xmark } from "iconoir-react";
-import { useSearchParams } from "react-router-dom";
 
 import { Dialog, IconButton } from "@repo/theme";
 
 import ClassBrowser from "@/components/ClassBrowser";
+import useCatalogBrowser from "@/components/ClassBrowser/hooks/useCatalogBrowser";
 import { Semester } from "@/lib/generated/graphql";
 
 import styles from "./Catalog.module.scss";
@@ -29,15 +29,13 @@ export default function Catalog({
   semester,
 }: CatalogProps) {
   const [open, setOpen] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [expanded, setExpanded] = useState(false);
+  // Own browser state here so filter/query survive the dialog unmounting.
+  const browser = useCatalogBrowser({ year, semester });
 
-  const handleOpenChange = (open: boolean) => {
-    setOpen(open);
-
-    if (open) return;
-
-    searchParams.delete("query");
-    setSearchParams(searchParams);
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) setExpanded(false);
   };
 
   const handleSelect = (
@@ -47,11 +45,8 @@ export default function Catalog({
     sessionId: string
   ) => {
     onClassSelect(subject, courseNumber, number, sessionId);
-
     setOpen(false);
-
-    searchParams.delete("query");
-    setSearchParams(searchParams);
+    setExpanded(false);
   };
 
   return (
@@ -74,6 +69,9 @@ export default function Catalog({
               year={year}
               onSelect={handleSelect}
               forceMode="semi-compact"
+              browser={browser}
+              expanded={expanded}
+              onExpandedChange={setExpanded}
             />
           </div>
         </Dialog.Drawer>
