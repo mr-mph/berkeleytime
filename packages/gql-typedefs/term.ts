@@ -69,6 +69,9 @@ export const termTypeDef = gql`
     endDate: String!
     sessions: [Session!]
     hasCatalogData: Boolean!
+
+    "True for manually-seeded draft/tentative terms whose data is subject to change."
+    isDraft: Boolean!
   }
 
   type Query {

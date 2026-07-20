@@ -287,13 +287,19 @@ export default function Catalog() {
 
     const recentTerm = getRecents(RecentType.CatalogTerm)[0];
 
-    // Default to the latest term by year + semester hierarchy
-    const latestTerm = terms.toSorted((a, b) => {
-      // Sort by year DESC first
-      if (a.year !== b.year) return b.year - a.year;
-      // Then by semester hierarchy DESC
-      return SEMESTER_ORDER[b.semester] - SEMESTER_ORDER[a.semester];
-    })[0];
+    // Default to the latest NON-DRAFT term. Draft/tentative terms (e.g. a
+    // department schedule seeded before SIS opens) stay selectable via the
+    // dropdown and direct URLs, but must not become the auto-selected landing
+    // term nor trigger the new-term-discovery migration below.
+    const nonDraftTerms = terms.filter((t) => !t.isDraft);
+    const latestTerm = (nonDraftTerms.length ? nonDraftTerms : terms).toSorted(
+      (a, b) => {
+        // Sort by year DESC first
+        if (a.year !== b.year) return b.year - a.year;
+        // Then by semester hierarchy DESC
+        return SEMESTER_ORDER[b.semester] - SEMESTER_ORDER[a.semester];
+      }
+    )[0];
 
     // Invalidate cached term if a newer semester has become available since
     // the user last picked one — this ensures new-term discovery.
@@ -370,6 +376,22 @@ export default function Catalog() {
     lastClassRef.current = _class;
   }
   const displayedClass = _class ?? lastClassRef.current;
+
+  // Derive draft status from the displayed class's OWN term rather than the
+  // currently-selected term, so the tentative badge and dimmed actions always
+  // match the class actually on screen — even while lastClassRef briefly holds
+  // a class from a previously-selected term during a term switch.
+  const displayedClassIsDraft = useMemo(
+    () =>
+      !!displayedClass &&
+      !!terms?.some(
+        (t) =>
+          t.year === displayedClass.year &&
+          t.semester === displayedClass.semester &&
+          t.isDraft
+      ),
+    [terms, displayedClass]
+  );
 
   const orderedNonEmptyCollections = useMemo<CollectionSummaryItem[]>(() => {
     if (!collections) return [];
@@ -689,7 +711,11 @@ export default function Catalog() {
           )}
           {displayedClass && !classError && (
             <div className={styles.classContainer}>
-              <Class class={displayedClass} scrollWithinContent />
+              <Class
+                class={displayedClass}
+                scrollWithinContent
+                isDraft={displayedClassIsDraft}
+              />
             </div>
           )}
         </Flex>

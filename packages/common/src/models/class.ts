@@ -65,6 +65,10 @@ export interface IClassItem {
   };
   // requisites.description
   requisites?: string;
+  // True for manually-seeded draft classes (department schedules published
+  // before SIS opens). Lets the importer re-run safely without touching real
+  // SIS-sourced classes.
+  isDraft?: boolean;
 }
 
 export interface IClassItemDocument extends IClassItem, Document {}
@@ -114,6 +118,7 @@ const classSchema = new Schema<IClassItem>({
     formalDescription: String,
   }, // NOTE: Exclude if always the same as course requirementsFulfilled, requirementDesignation.code
   requisites: { type: String }, // requisites.description
+  isDraft: { type: Boolean },
 });
 
 // for catalog, class, scheduler, and bookmarked classes controllers

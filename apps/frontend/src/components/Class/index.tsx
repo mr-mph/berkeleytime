@@ -126,6 +126,9 @@ interface UncontrolledProps {
 type ClassProps = {
   dialog?: boolean;
   scrollWithinContent?: boolean;
+  // When the class belongs to a draft/tentative term, dim the actions that
+  // depend on data not yet published (Berkeley Catalog link, enrollment, CCN).
+  isDraft?: boolean;
 } & (ControlledProps | UncontrolledProps);
 
 const ratingsTabClasses: RatingsTabClasses = {
@@ -164,6 +167,7 @@ export default function Class({
   course: providedCourse,
   dialog,
   scrollWithinContent = false,
+  isDraft = false,
 }: ClassProps) {
   const location = useLocation();
 
@@ -641,13 +645,24 @@ export default function Class({
                           />
                         )}
                       </h1>
+                      {isDraft && (
+                        <Badge
+                          label="Tentative — subject to change"
+                          color={Color.Amber}
+                          variant="border"
+                        />
+                      )}
                       <ThemeTooltip
-                        content="Refresh enrollment from Berkeley Catalog"
+                        content={
+                          isDraft
+                            ? "Enrollment isn't available yet — this schedule is tentative and subject to change."
+                            : "Refresh enrollment from Berkeley Catalog"
+                        }
                         trigger={
                           <IconButton
                             type="button"
                             aria-label="Refresh enrollment from Berkeley Catalog"
-                            disabled={refreshingEnrollment}
+                            disabled={refreshingEnrollment || isDraft}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -697,16 +712,30 @@ export default function Class({
                       }
                     />
                     <ThemeTooltip
-                      content="Open in Berkeley Catalog"
+                      content={
+                        isDraft
+                          ? "The Berkeley Catalog page isn't available yet — this schedule is tentative and subject to change."
+                          : "Open in Berkeley Catalog"
+                      }
                       trigger={
-                        <IconButton
-                          as="a"
-                          href={getExternalLink(_class)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <OpenNewWindow />
-                        </IconButton>
+                        isDraft ? (
+                          <IconButton
+                            type="button"
+                            aria-label="Open in Berkeley Catalog"
+                            disabled
+                          >
+                            <OpenNewWindow />
+                          </IconButton>
+                        ) : (
+                          <IconButton
+                            as="a"
+                            href={getExternalLink(_class)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <OpenNewWindow />
+                          </IconButton>
+                        )
                       }
                     />
                   </Flex>
@@ -774,7 +803,7 @@ export default function Class({
                     unitsMax={_class.unitsMax}
                     unitsMin={_class.unitsMin}
                   />
-                  {primarySection?.sectionId && (
+                  {!isDraft && primarySection?.sectionId && (
                     <CCN sectionId={primarySection.sectionId} />
                   )}
                   {activeReservedMaxCount > 0 && (
