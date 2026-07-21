@@ -337,6 +337,9 @@ const catalogClassSchema = new Schema<ICatalogClassItem>(
 // Base catalog query
 catalogClassSchema.index({ year: 1, semester: 1 });
 
+// Primary-section enrollment sync (catalog-sync-enrollment puller)
+catalogClassSchema.index({ year: 1, semester: 1, primarySectionId: 1 });
+
 // Level filter
 catalogClassSchema.index({ year: 1, semester: 1, level: 1 });
 

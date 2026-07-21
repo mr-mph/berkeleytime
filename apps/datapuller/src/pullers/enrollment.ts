@@ -7,12 +7,8 @@ import {
   TermModel,
 } from "@repo/common/models";
 
-import { updateCatalogEnrollment } from "../lib/catalog-denormalize";
+import { syncCatalogEnrollmentFromHistories } from "../lib/catalog-denormalize";
 import { GRANULARITY, getEnrollmentSingulars } from "../lib/enrollment";
-import {
-  buildActiveSeatReservations,
-  computeActiveReservedMaxCount,
-} from "../lib/enrollment-utils";
 import { Config } from "../shared/config";
 
 // duration of time in seconds that can pass before being considered a data gap
@@ -325,65 +321,14 @@ const updateEnrollmentHistories = async (config: Config) => {
   );
 
   // Update enrollment fields on denormalized catalog_classes.
-  // Re-fetch the latest enrollment snapshot for each term we updated.
   for (const term of terms) {
     const parsed = parseTermName(term.name);
     if (!parsed) continue;
-    const { year, semester } = parsed;
-
-    // Get all enrollment histories for this term
-    const histories = await NewEnrollmentHistoryModel.find({
-      year,
-      semester,
-    })
-      .select({
-        sectionId: 1,
-        seatReservationTypes: 1,
-        history: { $slice: -1 },
-      })
-      .lean();
-
-    const termEnrollments = new Map<
-      string,
-      {
-        status?: string;
-        enrolledCount?: number;
-        maxEnroll?: number;
-        waitlistedCount?: number;
-        maxWaitlist?: number;
-        activeReservedMaxCount?: number;
-        seatReservations?: {
-          description: string;
-          enrolledCount: number;
-          maxEnroll: number;
-        }[];
-      }
-    >();
-
-    for (const hist of histories) {
-      const latest = hist.history?.[0];
-      if (!latest) continue;
-      const seatReservations = buildActiveSeatReservations(
-        latest.seatReservationCount,
-        hist.seatReservationTypes
-      );
-      termEnrollments.set(hist.sectionId, {
-        status: latest.status,
-        enrolledCount: latest.enrolledCount,
-        maxEnroll: latest.maxEnroll,
-        waitlistedCount: latest.waitlistedCount,
-        maxWaitlist: latest.maxWaitlist,
-        activeReservedMaxCount: computeActiveReservedMaxCount(
-          latest.seatReservationCount,
-          hist.seatReservationTypes
-        ),
-        seatReservations,
-      });
-    }
-
-    if (termEnrollments.size > 0) {
-      await updateCatalogEnrollment(log, year, semester, termEnrollments);
-    }
+    await syncCatalogEnrollmentFromHistories(
+      log,
+      parsed.year,
+      parsed.semester
+    );
   }
 };
 

@@ -156,6 +156,17 @@ seed_database() {
     --nsExclude=bt.users
   docker cp "./docker/mongodb/init/02-seed-dev-users.js" "${mongo_container_id}:/tmp/02-seed-dev-users.js"
   docker exec "$mongo_container_id" mongosh bt /tmp/02-seed-dev-users.js
+
+  local datapuller_container_id
+  datapuller_container_id="$($compose_cmd ps -q datapuller)"
+  if [[ -n "$datapuller_container_id" ]]; then
+    log "Syncing catalog enrollment (reserved seats, open counts) from restored backup..."
+    docker exec "$datapuller_container_id" sh -c \
+      'cd /datapuller && turbo run main --filter=datapuller --env-mode=loose -- --puller=catalog-sync-enrollment'
+  else
+    warn "Datapuller container not running; skipped catalog enrollment sync."
+  fi
+
   log "MongoDB restore complete (users collection preserved / re-seeded)."
 }
 

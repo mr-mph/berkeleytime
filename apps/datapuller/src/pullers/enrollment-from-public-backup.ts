@@ -8,7 +8,10 @@ import { Readable } from "node:stream";
 import { model, Schema } from "mongoose";
 
 import { Config } from "../shared/config";
-import { updateCatalogRmpRatings } from "../lib/catalog-denormalize";
+import {
+  syncCatalogEnrollmentForCurrentTerm,
+  updateCatalogRmpRatings,
+} from "../lib/catalog-denormalize";
 import { syncCrosslistingEnrollmentFanout } from "./crosslisting-enrollment-fanout";
 
 const PUBLIC_BACKUP_BASE =
@@ -359,6 +362,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
     await updateCatalogRmpRatings(log);
 
     await syncCrosslistingEnrollmentFanout(config);
+    await syncCatalogEnrollmentForCurrentTerm(log);
     await invalidateBackendCaches(config.BACKEND_URL, log);
 
     await PublicBackupSyncStatusModel.findOneAndUpdate(
@@ -368,7 +372,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: head.etag,
           lastRestoredAt: new Date(),
-          message: `Merged public backup ${dateKey}; preserved users + rmp_professors + articulations; refreshed catalog RMP`,
+          message: `Merged public backup ${dateKey}; preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
         },
       },
       { upsert: true }

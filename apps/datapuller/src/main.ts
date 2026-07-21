@@ -1,6 +1,9 @@
 import { parseArgs } from "node:util";
 
-import { updateCatalogGradeSummaries } from "./lib/catalog-denormalize";
+import {
+  syncCatalogEnrollmentForCurrentTerm,
+  updateCatalogGradeSummaries,
+} from "./lib/catalog-denormalize";
 import articulationsPuller from "./pullers/articulations";
 import classesPuller from "./pullers/classes";
 import coursesPuller from "./pullers/courses";
@@ -48,6 +51,20 @@ const pullerMap: {
     migrationsPuller.backfillAggregatedMetricsClassId,
   "catalog-sync-grades": async (config: Config) =>
     updateCatalogGradeSummaries(config.log),
+  "catalog-sync-enrollment": async (config: Config) => {
+    await syncCatalogEnrollmentForCurrentTerm(config.log);
+    const url = new URL("/api/cache/invalidate-catalog", config.BACKEND_URL);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) {
+      config.log.warn(
+        `Cache invalidate returned HTTP ${response.status} from ${url.href}`
+      );
+    }
+  },
   ratemyprofessors: rateMyProfessorsPuller.syncRateMyProfessors,
   "ucb-catalog-enrollments":
     ucbCatalogEnrollmentsPuller.syncUcbCatalogEnrollments,

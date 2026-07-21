@@ -30,7 +30,75 @@ import {
 } from "@repo/shared";
 
 import { Config } from "../shared/config";
-import { buildActiveSeatReservations } from "./enrollment-utils";
+import { getCurrentCatalogTerm } from "../shared/term-selectors";
+import {
+  buildActiveSeatReservations,
+} from "./enrollment-utils";
+
+export type CatalogEnrollmentPatch = {
+  status?: string;
+  enrolledCount?: number;
+  maxEnroll?: number;
+  waitlistedCount?: number;
+  maxWaitlist?: number;
+  activeReservedMaxCount?: number;
+  seatReservations?: {
+    description: string;
+    enrolledCount: number;
+    maxEnroll: number;
+  }[];
+  enrollmentUpdatedAt?: Date;
+};
+
+export type UpdateCatalogEnrollmentOptions = {
+  /** Also patch embedded secondary sections (discussion/lab). Default true. */
+  includeSecondary?: boolean;
+};
+
+const BULK_BATCH_SIZE = 500;
+
+const seatReservationsEqual = (
+  a: CatalogEnrollmentPatch["seatReservations"],
+  b: CatalogEnrollmentPatch["seatReservations"]
+): boolean => {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i++) {
+    const l = left[i];
+    const r = right[i];
+    if (
+      l.description !== r.description ||
+      l.enrolledCount !== r.enrolledCount ||
+      l.maxEnroll !== r.maxEnroll
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const catalogEnrollmentPatchMatches = (
+  existing: Pick<
+    ICatalogClassItem,
+    | "enrollmentStatus"
+    | "enrolledCount"
+    | "maxEnroll"
+    | "waitlistedCount"
+    | "maxWaitlist"
+    | "activeReservedMaxCount"
+    | "seatReservations"
+  >,
+  patch: CatalogEnrollmentPatch
+): boolean =>
+  existing.enrollmentStatus === patch.status &&
+  existing.enrolledCount === patch.enrolledCount &&
+  existing.maxEnroll === patch.maxEnroll &&
+  existing.waitlistedCount === patch.waitlistedCount &&
+  existing.maxWaitlist === patch.maxWaitlist &&
+  (existing.activeReservedMaxCount ?? 0) ===
+    (patch.activeReservedMaxCount ?? 0) &&
+  seatReservationsEqual(existing.seatReservations, patch.seatReservations);
 
 type AggregatedMetric = {
   metricName: string;
@@ -728,6 +796,119 @@ export const updateCatalogGradeSummaries = async (log: Config["log"]) => {
 };
 
 /**
+ * Push latest enrollmenthistories snapshots (including reserved seats) onto
+ * catalog_classes for one term. Used after backup merges and enrollment pulls.
+ */
+export const syncCatalogEnrollmentFromHistories = async (
+  log: Config["log"],
+  year: number,
+  semester: string
+) => {
+  const primarySectionIds = (
+    await CatalogClassModel.distinct("primarySectionId", { year, semester })
+  ).filter((id): id is string => Boolean(id));
+
+  if (primarySectionIds.length === 0) {
+    log.info(`No catalog classes for ${semester} ${year}; skipping enrollment sync`);
+    return;
+  }
+
+  const existingCatalog = await CatalogClassModel.find({ year, semester })
+    .select({
+      primarySectionId: 1,
+      enrollmentStatus: 1,
+      enrolledCount: 1,
+      maxEnroll: 1,
+      waitlistedCount: 1,
+      maxWaitlist: 1,
+      activeReservedMaxCount: 1,
+      seatReservations: 1,
+    })
+    .lean();
+  const existingByPrimarySectionId = new Map(
+    existingCatalog.map((doc) => [doc.primarySectionId, doc])
+  );
+
+  const histories = await NewEnrollmentHistoryModel.find({
+    year,
+    semester,
+    sectionId: { $in: primarySectionIds },
+  })
+    .select({
+      sectionId: 1,
+      seatReservationTypes: 1,
+      history: { $slice: -1 },
+    })
+    .lean();
+
+  const termEnrollments = new Map<string, CatalogEnrollmentPatch>();
+  let skippedUnchanged = 0;
+
+  for (const hist of histories) {
+    const latest = hist.history?.[0];
+    if (!latest) continue;
+    const seatReservations = buildActiveSeatReservations(
+      latest.seatReservationCount,
+      hist.seatReservationTypes
+    );
+    const patch: CatalogEnrollmentPatch = {
+      status: latest.status,
+      enrolledCount: latest.enrolledCount,
+      maxEnroll: latest.maxEnroll,
+      waitlistedCount: latest.waitlistedCount,
+      maxWaitlist: latest.maxWaitlist,
+      activeReservedMaxCount: seatReservations.reduce(
+        (sum, reservation) => sum + reservation.maxEnroll,
+        0
+      ),
+      seatReservations,
+    };
+
+    const existing = existingByPrimarySectionId.get(hist.sectionId);
+    if (existing && catalogEnrollmentPatchMatches(existing, patch)) {
+      skippedUnchanged += 1;
+      continue;
+    }
+
+    termEnrollments.set(hist.sectionId, patch);
+  }
+
+  if (termEnrollments.size === 0) {
+    log.info(
+      `Catalog enrollment already up to date for ${semester} ${year} (${skippedUnchanged} primary section(s) unchanged)`
+    );
+    return;
+  }
+
+  log.info(
+    `Syncing ${termEnrollments.size} changed primary section(s) for ${semester} ${year} (${skippedUnchanged} unchanged)`
+  );
+  await updateCatalogEnrollment(log, year, semester, termEnrollments, {
+    includeSecondary: false,
+  });
+};
+
+/** Sync enrollment onto catalog_classes for the current active term only. */
+export const syncCatalogEnrollmentForCurrentTerm = async (
+  log: Config["log"]
+) => {
+  const currentTerm = await getCurrentCatalogTerm();
+  if (!currentTerm) {
+    log.warn("No active term with catalog data; skipping catalog enrollment sync");
+    return;
+  }
+
+  log.info(
+    `Syncing catalog enrollment from histories for ${currentTerm.semester} ${currentTerm.year}`
+  );
+  await syncCatalogEnrollmentFromHistories(
+    log,
+    currentTerm.year,
+    currentTerm.semester
+  );
+};
+
+/**
  * Updates only the enrollment fields on catalog_classes for sections that changed.
  * Much cheaper than a full rebuild - used by the enrollment puller.
  */
@@ -735,24 +916,10 @@ export const updateCatalogEnrollment = async (
   log: Config["log"],
   year: number,
   semester: string,
-  sectionEnrollments: Map<
-    string,
-    {
-      status?: string;
-      enrolledCount?: number;
-      maxEnroll?: number;
-      waitlistedCount?: number;
-      maxWaitlist?: number;
-      activeReservedMaxCount?: number;
-      seatReservations?: {
-        description: string;
-        enrolledCount: number;
-        maxEnroll: number;
-      }[];
-      enrollmentUpdatedAt?: Date;
-    }
-  >
+  sectionEnrollments: Map<string, CatalogEnrollmentPatch>,
+  options: UpdateCatalogEnrollmentOptions = {}
 ) => {
+  const { includeSecondary = true } = options;
   if (sectionEnrollments.size === 0) return;
 
   const bulkOps: any[] = [];
@@ -786,31 +953,39 @@ export const updateCatalogEnrollment = async (
       },
     });
 
-    // Update secondary sections enrollment
-    bulkOps.push({
-      updateMany: {
-        filter: { year, semester, "sections.sectionId": sectionId },
-        update: {
-          $set: {
-            "sections.$.enrollmentStatus": enrollment.status,
-            "sections.$.enrolledCount": enrollment.enrolledCount,
-            "sections.$.maxEnroll": enrollment.maxEnroll,
-            "sections.$.waitlistedCount": enrollment.waitlistedCount,
-            "sections.$.maxWaitlist": enrollment.maxWaitlist,
+    if (includeSecondary) {
+      // Update secondary sections enrollment
+      bulkOps.push({
+        updateMany: {
+          filter: { year, semester, "sections.sectionId": sectionId },
+          update: {
+            $set: {
+              "sections.$.enrollmentStatus": enrollment.status,
+              "sections.$.enrolledCount": enrollment.enrolledCount,
+              "sections.$.maxEnroll": enrollment.maxEnroll,
+              "sections.$.waitlistedCount": enrollment.waitlistedCount,
+              "sections.$.maxWaitlist": enrollment.maxWaitlist,
+            },
           },
         },
-      },
-    });
+      });
+    }
   }
 
-  if (bulkOps.length > 0) {
-    const result = await CatalogClassModel.bulkWrite(bulkOps, {
+  if (bulkOps.length === 0) return;
+
+  let modifiedCount = 0;
+  for (let i = 0; i < bulkOps.length; i += BULK_BATCH_SIZE) {
+    const batch = bulkOps.slice(i, i + BULK_BATCH_SIZE);
+    const result = await CatalogClassModel.bulkWrite(batch, {
       ordered: false,
     });
-    log.info(
-      `Updated enrollment for ${sectionEnrollments.size} sections on catalog_classes (${result.modifiedCount} docs modified)`
-    );
+    modifiedCount += result.modifiedCount;
   }
+
+  log.info(
+    `Updated enrollment for ${sectionEnrollments.size} section(s) on catalog_classes (${modifiedCount} docs modified)`
+  );
 };
 
 /**
