@@ -18,6 +18,7 @@ import {
 } from "@repo/shared";
 
 import { updateCatalogEnrollment } from "../lib/catalog-denormalize";
+import { isSectionEnrollmentBlankInDb } from "../lib/crosslisting-enrollment-fanout";
 import { Config } from "../shared/config";
 import { getActiveTerms } from "../shared/term-selectors";
 
@@ -310,26 +311,14 @@ const scrapeEnrollmentForSection = async (
   }
 };
 
-/**
- * True only when the sibling's catalog page is confirmed blank (0/0).
- * False when it has its own enrollment; null on fetch failure (do not fan out).
- */
 const isSiblingCatalogBlank = async (
   section: ISectionItem,
-  log: Config["log"]
+  _log: Config["log"]
 ): Promise<boolean | null> => {
-  if (!section.component) return true;
-  const url = buildUcbCatalogUrl({
-    year: section.year,
-    semester: section.semester,
-    subject: section.subject,
-    courseNumber: section.courseNumber,
-    number: section.number,
-    component: section.component,
-  });
+  // Use stored enrollment (data-source agnostic) instead of re-fetching
+  // classes.berkeley.edu for every combinedSections sibling.
   try {
-    const scraped = await fetchWithRetry(url, log);
-    return isBlankUcbEnrollment(scraped.primary);
+    return await isSectionEnrollmentBlankInDb(section);
   } catch {
     return null;
   }

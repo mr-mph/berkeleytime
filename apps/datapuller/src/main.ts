@@ -5,8 +5,10 @@ import articulationsPuller from "./pullers/articulations";
 import classesPuller from "./pullers/classes";
 import coursesPuller from "./pullers/courses";
 import decalsPuller from "./pullers/decals";
+import enrollmentFromPublicBackupPuller from "./pullers/enrollment-from-public-backup";
 import enrollmentHistoriesPuller from "./pullers/enrollment";
 import enrollmentTimeframePuller from "./pullers/enrollment-timeframe";
+import crosslistingEnrollmentFanoutPuller from "./pullers/crosslisting-enrollment-fanout";
 import gradeDistributionsPuller from "./pullers/grade-distributions";
 import migrationsPuller from "./pullers/migrations";
 import rateMyProfessorsPuller from "./pullers/ratemyprofessors";
@@ -36,6 +38,10 @@ const pullerMap: {
   "grades-last-five-years": gradeDistributionsPuller.lastFiveYearsTerms,
   enrollments: enrollmentHistoriesPuller.updateEnrollmentHistories,
   "enrollment-timeframe": enrollmentTimeframePuller.syncEnrollmentTimeframe,
+  "enrollment-from-public-backup":
+    enrollmentFromPublicBackupPuller.syncEnrollmentFromPublicBackup,
+  "crosslisting-enrollment-fanout":
+    crosslistingEnrollmentFanoutPuller.syncCrosslistingEnrollmentFanout,
   "terms-all": termsPuller.allTerms,
   "terms-nearby": termsPuller.nearbyTerms,
   "migrate-aggregated-metrics-classid":

@@ -224,24 +224,33 @@ const findCombinedSiblingSections = async (
 };
 
 /**
- * True only when the sibling's catalog page is confirmed blank (0/0).
- * False when it has its own enrollment; null on fetch failure (do not fan out).
+ * True when the sibling's stored enrollment is blank (0/0) or missing.
+ * Uses DB state so fan-out works for scrape, backup, and SIS sources alike.
  */
 const isSiblingCatalogBlank = async (
   section: ISectionItem
 ): Promise<boolean | null> => {
-  if (!section.component) return true;
-  const url = buildUcbCatalogUrl({
-    year: section.year,
-    semester: section.semester as Semester,
-    subject: section.subject,
-    courseNumber: section.courseNumber,
-    number: section.number,
-    component: section.component,
-  });
   try {
-    const scraped = await fetchUcbCatalogEnrollment(url);
-    return isBlankUcbEnrollment(scraped.primary);
+    let enrollment = await NewEnrollmentHistoryModel.findOne({
+      year: section.year,
+      semester: section.semester,
+      sessionId: section.sessionId,
+      subject: section.subject,
+      courseNumber: section.courseNumber,
+      sectionNumber: section.number,
+    }).lean();
+
+    if (!enrollment) {
+      enrollment = await NewEnrollmentHistoryModel.findOne({
+        termId: section.termId,
+        sessionId: section.sessionId,
+        sectionId: section.sectionId,
+      }).lean();
+    }
+
+    if (!enrollment?.history?.length) return true;
+    const latest = enrollment.history[enrollment.history.length - 1];
+    return isBlankUcbEnrollment(latest);
   } catch {
     return null;
   }

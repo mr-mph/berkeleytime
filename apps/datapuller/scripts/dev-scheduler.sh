@@ -1,10 +1,11 @@
 #!/bin/sh
 # Local/dev datapuller schedule (lighter than prod; skips last-five-years jobs).
 # Intervals:
-#   enrollments (SIS)           disabled locally (needs SIS API keys)
-#   ucb-catalog-enrollments     continuous (no gap between passes)
-#   catalog refresh set         every 12 hours
-#   daily extras                every 24 hours
+#   enrollments (SIS)                    disabled locally (needs SIS API keys)
+#   ucb-catalog-enrollments              disabled (UC Berkeley IT request)
+#   enrollment-from-public-backup        hourly (public daily backup @ 05:00 PT)
+#   catalog refresh set                  every 12 hours
+#   daily extras                         every 24 hours
 
 set -eu
 
@@ -28,12 +29,25 @@ echo "Datapuller dev scheduler started."
 #   done
 # ) &
 
-# Enrollment: classes.berkeley.edu scrape (prominence-ordered).
-# Loop continuously; within a pass, recently-scraped classes are skipped (TTL in puller).
+# Enrollment: classes.berkeley.edu scrape (disabled — UC Berkeley IT request).
+# (
+#   sleep 15
+#   while true; do
+#     run_puller ucb-catalog-enrollments
+#   done
+# ) &
+
+# Enrollment: merge berkeleytime.com public daily backup when available.
+# Public backups publish ~05:00 America/Los_Angeles; poll hourly and no-op if
+# already merged for that date. Merges without --drop so newer local docs win.
+# Crosslisting fan-out also runs after each successful merge.
 (
-  sleep 15
+  sleep 20
   while true; do
-    run_puller ucb-catalog-enrollments
+    run_puller enrollment-from-public-backup
+    # Keep fan-out fresh even when the backup is unchanged.
+    run_puller crosslisting-enrollment-fanout
+    sleep 3600
   done
 ) &
 
@@ -49,7 +63,7 @@ echo "Datapuller dev scheduler started."
   done
 ) &
 
-# Daily extras (DeCals, recent grades, enrollment windows, RMP)
+# Daily extras (DeCals, recent grades, enrollment windows, RMP, ASSIST)
 (
   sleep 90
   while true; do
@@ -58,6 +72,7 @@ echo "Datapuller dev scheduler started."
     run_puller enrollment-timeframe
     run_puller catalog-sync-grades
     run_puller ratemyprofessors
+    run_puller articulations
     sleep 86400
   done
 ) &

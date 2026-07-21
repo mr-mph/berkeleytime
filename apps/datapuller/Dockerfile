@@ -1,5 +1,7 @@
 FROM node:22-alpine AS base
 RUN ["npm", "install", "-g", "turbo@latest"]
+# mongorestore for enrollment-from-public-backup puller
+RUN apk add --no-cache mongodb-tools
 
 FROM base AS datapuller-builder
 WORKDIR /datapuller

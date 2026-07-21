@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent,
 } from "react";
 
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -15,8 +16,12 @@ import { OpenNewWindow, Refresh } from "iconoir-react";
 import { Tabs } from "radix-ui";
 import { Link, useLocation } from "react-router-dom";
 
-import { MetricName, REQUIRED_METRICS } from "@repo/shared";
-import { USER_REQUIRED_RATINGS_TO_UNLOCK } from "@repo/shared";
+import {
+  ENROLLMENT_CATALOG_REFRESH_ENABLED,
+  MetricName,
+  REQUIRED_METRICS,
+  USER_REQUIRED_RATINGS_TO_UNLOCK,
+} from "@repo/shared";
 import {
   Badge,
   Box,
@@ -241,7 +246,7 @@ export default function Class({
   const primarySection = _class?.primarySection ?? null;
 
   const handleRefreshEnrollment = useCallback(async () => {
-    if (!_class) return;
+    if (!ENROLLMENT_CATALOG_REFRESH_ENABLED || !_class) return;
     try {
       await refreshClassEnrollment({
         variables: {
@@ -300,7 +305,10 @@ export default function Class({
         error &&
         typeof error === "object" &&
         "graphQLErrors" in error &&
-        Array.isArray((error as { graphQLErrors?: Array<{ message?: string }> }).graphQLErrors)
+        Array.isArray(
+          (error as { graphQLErrors?: Array<{ message?: string }> })
+            .graphQLErrors
+        )
           ? (error as { graphQLErrors: Array<{ message?: string }> })
               .graphQLErrors[0]?.message
           : undefined;
@@ -313,6 +321,7 @@ export default function Class({
       setIsErrorDialogOpen(true);
     }
   }, [_class, providedClass, refreshClassEnrollment, refetchClass]);
+
   const classIdentity = useMemo(() => {
     if (!_class) return null;
     return [
@@ -642,24 +651,38 @@ export default function Class({
                         )}
                       </h1>
                       <ThemeTooltip
-                        content="Refresh enrollment from Berkeley Catalog"
+                        content={
+                          ENROLLMENT_CATALOG_REFRESH_ENABLED
+                            ? "Refresh enrollment from Berkeley Catalog"
+                            : "Enrollment scraping disabled for the time being due to request from UC Berkeley IT"
+                        }
                         trigger={
-                          <IconButton
-                            type="button"
-                            aria-label="Refresh enrollment from Berkeley Catalog"
-                            disabled={refreshingEnrollment}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void handleRefreshEnrollment();
-                            }}
-                          >
-                            {refreshingEnrollment ? (
-                              <LoadingIndicator />
-                            ) : (
-                              <Refresh />
-                            )}
-                          </IconButton>
+                          // Wrap when disabled so the tooltip still works.
+                          <span style={{ display: "inline-flex" }}>
+                            <IconButton
+                              type="button"
+                              aria-label={
+                                ENROLLMENT_CATALOG_REFRESH_ENABLED
+                                  ? "Refresh enrollment from Berkeley Catalog"
+                                  : "Enrollment scraping disabled for the time being due to request from UC Berkeley IT"
+                              }
+                              disabled={
+                                !ENROLLMENT_CATALOG_REFRESH_ENABLED ||
+                                refreshingEnrollment
+                              }
+                              onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void handleRefreshEnrollment();
+                              }}
+                            >
+                              {refreshingEnrollment ? (
+                                <LoadingIndicator />
+                              ) : (
+                                <Refresh />
+                              )}
+                            </IconButton>
+                          </span>
                         }
                       />
                     </Flex>

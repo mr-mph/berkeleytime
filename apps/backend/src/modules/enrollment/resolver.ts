@@ -1,6 +1,8 @@
 import type { RedisClientType } from "redis";
+import { GraphQLError } from "graphql";
 
 import { EnrollmentTimeframeModel } from "@repo/common/models";
+import { ENROLLMENT_CATALOG_REFRESH_ENABLED } from "@repo/shared";
 
 import { getEnrollment, refreshClassEnrollment } from "./controller";
 import { EnrollmentModule } from "./generated-types/module-types";
@@ -47,6 +49,13 @@ const resolvers: EnrollmentModule.Resolvers = {
       { year, semester, sessionId, subject, courseNumber, number },
       context: EnrollmentContext
     ) => {
+      if (!ENROLLMENT_CATALOG_REFRESH_ENABLED) {
+        throw new GraphQLError(
+          "Enrollment scraping disabled for the time being due to request from UC Berkeley IT",
+          { extensions: { code: "FORBIDDEN" } }
+        );
+      }
+
       return await refreshClassEnrollment(
         year,
         semester,
