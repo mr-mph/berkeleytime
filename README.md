@@ -7,6 +7,7 @@
 - sort by ratemyprofessor rating avg of each course
 - see ratemyprofessor rating avgs on course cards
 - sort by A/A+ percent or # of ratings
+- search spring 2027 eecs listings
 
 ### course listings:
 
