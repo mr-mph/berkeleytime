@@ -22,7 +22,7 @@ export const catalogTypeDef = gql`
     NON_RESERVED_OPEN
     WAITLIST_OPEN
     OPEN_RESERVED
-    EXCLUSIVE_RESERVED_SEATS
+    OPEN_FOR_YOU
   }
 
   input CatalogCourseIdentifierInput {

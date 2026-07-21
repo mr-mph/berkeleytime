@@ -6,6 +6,7 @@ import { Badge, Color } from "@repo/theme";
 
 import {
   findBestOpenMatch,
+  findBestSelectedMatch,
   formatReservedSeatsRemaining,
   getSelectedReservedSeatGroups,
 } from "@/lib/reservedSeatGroups";
@@ -60,6 +61,17 @@ export function ReservedSeatingHoverCard({
       selected
     ) !== null;
 
+  const hasFullHighlight =
+    !hasOpenHighlight &&
+    findBestSelectedMatch(
+      validReservations.map((r) => ({
+        description: r.requirementGroup.description,
+        enrolledCount: r.enrolledCount,
+        maxEnroll: r.maxEnroll,
+      })),
+      selected
+    ) !== null;
+
   return (
     <HoverCard.Root openDelay={200} closeDelay={100}>
       <HoverCard.Trigger asChild>
@@ -67,6 +79,7 @@ export function ReservedSeatingHoverCard({
           type="button"
           className={classNames(styles.trigger, {
             [styles.triggerHighlight]: hasOpenHighlight,
+            [styles.triggerFullHighlight]: hasFullHighlight,
           })}
         >
           <SleeperChair width={14} height={14} />
@@ -88,6 +101,7 @@ export function ReservedSeatingHoverCard({
                 reservation.requirementGroup.description
               );
               const isOpenMatch = isSelected && !isFull;
+              const isFullMatch = isSelected && isFull;
 
               return (
                 <div key={index} className={styles.group}>
@@ -103,7 +117,7 @@ export function ReservedSeatingHoverCard({
                       color={
                         isOpenMatch
                           ? Color.Green
-                          : isFull
+                          : isFullMatch || isFull
                             ? Color.Red
                             : Color.Gray
                       }

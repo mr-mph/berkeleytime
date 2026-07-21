@@ -26,6 +26,7 @@ import { IEnrollmentSingular } from "@/lib/api/enrollment";
 import { Color, Semester } from "@/lib/generated/graphql";
 import {
   findBestOpenMatch,
+  findBestSelectedMatch,
   formatReservedSeatsRemaining,
   getReservedSeatsRemaining,
   getSelectedReservedSeatGroups,
@@ -157,10 +158,21 @@ export default function ClassCard({
   const maxEnroll = _class?.primarySection?.enrollment?.latest?.maxEnroll ?? 0;
   const seatReservations =
     _class?.primarySection?.enrollment?.latest?.seatReservations;
+  const selectedReservedSeatGroups = getSelectedReservedSeatGroups();
+  const reservedMatch = findBestSelectedMatch(
+    seatReservations,
+    selectedReservedSeatGroups
+  );
   const openReservedMatch = findBestOpenMatch(
     seatReservations,
-    getSelectedReservedSeatGroups()
+    selectedReservedSeatGroups
   );
+  const reservedSeatsRemaining = reservedMatch
+    ? getReservedSeatsRemaining(
+        reservedMatch.enrolledCount,
+        reservedMatch.maxEnroll
+      )
+    : 0;
   const ratingsCount = _class?.course?.aggregatedRatings
     ? Math.max(
         0,
@@ -316,18 +328,22 @@ export default function ClassCard({
                             className={classNames(styles.reservedSeating, {
                               [styles.reservedSeatingHighlight]:
                                 !!openReservedMatch,
+                              [styles.reservedSeatingFull]:
+                                !!reservedMatch && !openReservedMatch,
                             })}
                           >
                             <InfoCircle className={styles.reservedSeatingIcon} />
-                            {openReservedMatch
-                              ? `${getReservedSeatsRemaining(openReservedMatch.enrolledCount, openReservedMatch.maxEnroll).toLocaleString()} Rsvd`
+                            {openReservedMatch && reservedSeatsRemaining > 0
+                              ? `${reservedSeatsRemaining.toLocaleString()} Rsvd`
                               : "Rsvd"}
                           </span>
                         }
                         title="Reserved Seating"
                         description={
-                          openReservedMatch
-                            ? `${openReservedMatch.description}: ${formatReservedSeatsRemaining(openReservedMatch.enrolledCount, openReservedMatch.maxEnroll)} reserved seats left.`
+                          reservedMatch
+                            ? openReservedMatch
+                              ? `${reservedMatch.description}: ${formatReservedSeatsRemaining(reservedMatch.enrolledCount, reservedMatch.maxEnroll)} reserved seats left.`
+                              : `${reservedMatch.description}: ${formatReservedSeatsRemaining(reservedMatch.enrolledCount, reservedMatch.maxEnroll)} reserved seats (full).`
                             : `${activeReservedMaxCount.toLocaleString()} out of ${maxEnroll.toLocaleString()} seats for this class are reserved.`
                         }
                       />

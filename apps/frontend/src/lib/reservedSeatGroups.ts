@@ -73,6 +73,30 @@ export const findBestOpenMatch = (
   return best;
 };
 
+/** Prefer open matching group with most remaining; otherwise any selected group. */
+export const findBestSelectedMatch = (
+  seatReservations: SeatReservationSummary[] | null | undefined,
+  selected: string[] | null | undefined
+): SeatReservationSummary | null => {
+  const openMatch = findBestOpenMatch(seatReservations, selected);
+  if (openMatch) return openMatch;
+
+  if (!seatReservations?.length || !selected?.length) return null;
+  const selectedSet = new Set(selected);
+  let best: SeatReservationSummary | null = null;
+  let bestMaxEnroll = -1;
+
+  for (const reservation of seatReservations) {
+    if (!selectedSet.has(reservation.description)) continue;
+    if (reservation.maxEnroll > bestMaxEnroll) {
+      best = reservation;
+      bestMaxEnroll = reservation.maxEnroll;
+    }
+  }
+
+  return best;
+};
+
 export const getReservedSeatsRemaining = (
   enrolledCount: number,
   maxEnroll: number

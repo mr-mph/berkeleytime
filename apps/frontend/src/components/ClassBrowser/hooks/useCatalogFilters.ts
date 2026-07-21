@@ -30,12 +30,19 @@ import {
 import {
   Day,
   EnrollmentFilter,
+  enrollmentFiltersRequiringReservedGroups,
   GradingFilter,
   Level,
   SortBy,
   TimeRange,
   UnitRange,
 } from "../browser";
+
+const LEGACY_ENROLLMENT_FILTER_MAP: Record<string, EnrollmentFilter> = {
+  "Open Reserved Seats": EnrollmentFilter.OpenReserved,
+  "Reserved Seats": EnrollmentFilter.OpenForYou,
+  "Exclusive Reserved Seats": EnrollmentFilter.OpenForYou,
+};
 
 type CatalogSortBy = GetCatalogSearchQueryVariables["sortBy"];
 type CatalogEnrollmentFilter = NonNullable<ICatalogFilters>["enrollmentFilter"];
@@ -89,14 +96,14 @@ export const mapEnrollmentFilter = (
   switch (filter) {
     case EnrollmentFilter.Open:
       return "OPEN" as CatalogEnrollmentFilter;
+    case EnrollmentFilter.OpenForYou:
+      return "OPEN_FOR_YOU" as CatalogEnrollmentFilter;
+    case EnrollmentFilter.OpenReserved:
+      return "OPEN_RESERVED" as CatalogEnrollmentFilter;
     case EnrollmentFilter.OpenApartFromReserved:
       return "NON_RESERVED_OPEN" as CatalogEnrollmentFilter;
     case EnrollmentFilter.WaitlistOpen:
       return "WAITLIST_OPEN" as CatalogEnrollmentFilter;
-    case EnrollmentFilter.OpenReserved:
-      return "OPEN_RESERVED" as CatalogEnrollmentFilter;
-    case EnrollmentFilter.ExclusiveReserved:
-      return "EXCLUSIVE_RESERVED_SEATS" as CatalogEnrollmentFilter;
     default:
       return undefined;
   }
@@ -320,13 +327,13 @@ export default function useCatalogFilters({
   const enrollmentFilter = useMemo(() => {
     if (persistent) {
       const param = searchParams.get("enrollmentFilter");
+      if (!param) return null;
       if (
-        param &&
         Object.values(EnrollmentFilter).includes(param as EnrollmentFilter)
       ) {
         return param as EnrollmentFilter;
       }
-      return null;
+      return LEGACY_ENROLLMENT_FILTER_MAP[param] ?? null;
     }
     return localEnrollmentFilter;
   }, [searchParams, localEnrollmentFilter, persistent]);
@@ -406,8 +413,8 @@ export default function useCatalogFilters({
 
     // Identity groups only hit the server for reserved-seat enrollment filters.
     if (
-      (enrollmentFilter === EnrollmentFilter.OpenReserved ||
-        enrollmentFilter === EnrollmentFilter.ExclusiveReserved) &&
+      enrollmentFilter &&
+      enrollmentFiltersRequiringReservedGroups.includes(enrollmentFilter) &&
       reservedSeatGroups.length > 0
     ) {
       filters.reservedSeatGroups = reservedSeatGroups;
@@ -591,11 +598,13 @@ export default function useCatalogFilters({
       if (persistent) {
         writeReservedSeatGroupsToSearchParams(searchParams, groups);
         if (groups.length === 0) {
+          const current = searchParams.get("enrollmentFilter");
           if (
-            searchParams.get("enrollmentFilter") ===
-              EnrollmentFilter.OpenReserved ||
-            searchParams.get("enrollmentFilter") ===
-              EnrollmentFilter.ExclusiveReserved
+            current &&
+            (enrollmentFiltersRequiringReservedGroups.includes(
+              current as EnrollmentFilter
+            ) ||
+              current in LEGACY_ENROLLMENT_FILTER_MAP)
           ) {
             searchParams.delete("enrollmentFilter");
           }
@@ -603,8 +612,8 @@ export default function useCatalogFilters({
         setSearchParams(searchParams);
       } else if (
         groups.length === 0 &&
-        (localEnrollmentFilter === EnrollmentFilter.OpenReserved ||
-          localEnrollmentFilter === EnrollmentFilter.ExclusiveReserved)
+        localEnrollmentFilter &&
+        enrollmentFiltersRequiringReservedGroups.includes(localEnrollmentFilter)
       ) {
         setLocalEnrollmentFilter(null);
       }

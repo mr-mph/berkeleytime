@@ -50,6 +50,11 @@
   font-weight: var(--font-medium);
 }
 
+.triggerFullHighlight {
+  color: var(--red-600, #dc2626);
+  font-weight: var(--font-medium);
+}
+
 .header {
   padding: 8px 12px;
   font-size: var(--text-14);
