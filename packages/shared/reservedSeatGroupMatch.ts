@@ -6,7 +6,8 @@ export type ReservedSeatProfile = {
   majors?: string[] | null;
   minors?: string[] | null;
   termsInAttendance?: number | null;
-  isNewTransfer?: boolean | null;
+  /** True if the student transferred to Berkeley (newness comes from terms). */
+  isTransfer?: boolean | null;
 };
 
 const OPAQUE_GROUP_PATTERNS = [
@@ -339,21 +340,33 @@ export type ReservedSeatGroupScore = {
   score: number;
 };
 
+type ScoreOptions = {
+  /**
+   * When true, include weak / non-suggested matches for browse ranking
+   * (hard conflicts still score 0 and sort last).
+   */
+  includeWeakMatches?: boolean;
+};
+
 /**
  * Rank reserved-seat requirement-group descriptions against an academic profile.
  * Opaque permission-only groups are never suggested.
- * Level alone is never enough — need major/college/terms/transfer/generic-undergrad
+ * Level alone is never enough for auto-suggest — need major/college/terms/transfer
  * specificity (except canonical new-first-year pools).
  */
 export const scoreReservedSeatGroups = (
   descriptions: string[],
-  profile: ReservedSeatProfile
+  profile: ReservedSeatProfile,
+  options: ScoreOptions = {}
 ): ReservedSeatGroupScore[] => {
+  const includeWeakMatches = Boolean(options.includeWeakMatches);
   const colleges = profile.colleges?.filter(Boolean) ?? [];
   const majors = profile.majors?.filter(Boolean) ?? [];
   const minors = profile.minors?.filter(Boolean) ?? [];
-  const isNewTransfer = Boolean(profile.isNewTransfer);
+  const isTransfer = Boolean(profile.isTransfer);
   const terms = profile.termsInAttendance;
+  const isNewByTerms =
+    terms != null && !Number.isNaN(terms) && terms <= 2;
 
   const scored: ReservedSeatGroupScore[] = [];
 
@@ -364,23 +377,28 @@ export const scoreReservedSeatGroups = (
     let hardFail = false;
 
     const transfer = isTransferGroup(description);
-    if (transfer && !isNewTransfer) {
+    const isNewTransferLabel =
+      /\bnew\b[\w\s]*\btransfers?\b|\btransfers?\b[\w\s]*\bnew\b/i.test(
+        description
+      );
+    if (transfer && !isTransfer) {
       hardFail = true;
-    } else if (transfer && isNewTransfer) {
-      score += 40;
+    } else if (transfer && isTransfer) {
+      // "New transfer" pools only apply while terms are still low.
+      if (isNewTransferLabel && !isNewByTerms) {
+        hardFail = true;
+      } else {
+        score += 40;
+      }
     }
 
     // "New First Year Undergraduate Students" / new freshman pools:
-    // first-year admits (typically ≤2 terms), not new transfers.
+    // first-year admits (typically ≤2 terms), not transfers.
     const newFirstYearEligible =
-      isNewStudentGroup(description) &&
-      !isNewTransfer &&
-      terms != null &&
-      !Number.isNaN(terms) &&
-      terms <= 2;
+      isNewStudentGroup(description) && !isTransfer && isNewByTerms;
     if (
       isNewStudentGroup(description) &&
-      (isNewTransfer || (terms != null && terms > 2))
+      (isTransfer || (terms != null && terms > 2))
     ) {
       hardFail = true;
     } else if (newFirstYearEligible) {
@@ -421,6 +439,12 @@ export const scoreReservedSeatGroups = (
     score += majorHits * 40;
     score += minorHits * 30;
 
+    // Soft browse ranking: partial college/major token overlap even when the
+    // structured alias map missed (helps order the long tail in the dropdown).
+    if (includeWeakMatches) {
+      score += softProfileTokenOverlap(description, colleges, majors, minors);
+    }
+
     const genericTerms = isGenericTermsGroup(description) && termsOk === true;
     if (genericTerms) score += 25;
 
@@ -451,9 +475,19 @@ export const scoreReservedSeatGroups = (
       genericTerms ||
       genericUndergrad ||
       newFirstYearSignal ||
-      (transfer && isNewTransfer && (majorHits > 0 || collegeCounts));
+      (transfer && isTransfer);
 
-    if (hardFail || !hasSpecificSignal || score <= 0) continue;
+    if (hardFail) {
+      if (includeWeakMatches) {
+        scored.push({ description, score: 0 });
+      }
+      continue;
+    }
+
+    if (!includeWeakMatches && (!hasSpecificSignal || score <= 0)) {
+      continue;
+    }
+
     scored.push({ description, score });
   }
 
@@ -461,6 +495,75 @@ export const scoreReservedSeatGroups = (
     (a, b) => b.score - a.score || a.description.localeCompare(b.description)
   );
 };
+
+/**
+ * Soft token overlap between a group label and the user's college/major/minor
+ * display names (and short aliases). Used only for browse ranking.
+ */
+const softProfileTokenOverlap = (
+  description: string,
+  colleges: string[],
+  majors: string[],
+  minors: string[]
+): number => {
+  const haystack = normalize(description);
+  if (!haystack) return 0;
+
+  let bonus = 0;
+  const addTerms = (
+    values: string[],
+    aliasMap: Record<string, string[]>,
+    weight: number
+  ) => {
+    for (const value of values) {
+      const candidates = [
+        ...aliasesFor(value, aliasMap),
+        value,
+        normalize(value),
+      ];
+      for (const alias of candidates) {
+        const normalizedAlias = normalize(alias);
+        if (normalizedAlias.length < 4) continue;
+        if (haystack.includes(normalizedAlias)) {
+          bonus += weight;
+          break;
+        }
+        // Multi-word / short college names: count significant token hits.
+        const tokens = normalizedAlias
+          .split(" ")
+          .filter((token) => token.length >= 4);
+        if (tokens.length === 0) continue;
+        const hits = tokens.filter((token) =>
+          new RegExp(
+            `\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`
+          ).test(haystack)
+        ).length;
+        if (tokens.length === 1 && hits === 1) {
+          bonus += Math.floor(weight / 2);
+          break;
+        }
+        if (tokens.length >= 2 && hits >= 2) {
+          bonus += Math.floor(weight * (hits / tokens.length));
+          break;
+        }
+      }
+    }
+  };
+
+  addTerms(colleges, COLLEGE_ALIASES, 8);
+  addTerms(majors, MAJOR_ALIASES, 12);
+  addTerms(minors, MAJOR_ALIASES, 10);
+  return bonus;
+};
+
+/** Full ranked list for dropdown browse (suggested-quality + weaker neighbors). */
+export const rankReservedSeatGroups = (
+  descriptions: string[],
+  profile: ReservedSeatProfile
+): string[] =>
+  scoreReservedSeatGroups(descriptions, profile, {
+    includeWeakMatches: true,
+  }).map((item) => item.description);
 
 export const suggestReservedSeatGroups = (
   descriptions: string[],

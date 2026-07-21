@@ -38,7 +38,10 @@ export const userSchema = new Schema(
     },
     studentLevel: {
       type: String,
-      enum: ["UNDERGRAD", "MASTERS", "PHD", "GRADUATE"],
+      enum: {
+        values: ["UNDERGRAD", "MASTERS", "PHD", "GRADUATE", null],
+        message: "{VALUE} is not a valid student level",
+      },
       required: false,
       default: null,
     },
@@ -53,7 +56,7 @@ export const userSchema = new Schema(
       default: null,
       min: 0,
     },
-    isNewTransfer: {
+    isTransfer: {
       type: Boolean,
       required: false,
       default: false,

@@ -20,7 +20,7 @@ export const READ_USER = gql`
       studentLevel
       colleges
       termsInAttendance
-      isNewTransfer
+      isTransfer
       reservedSeatGroups
     }
   }
@@ -38,7 +38,7 @@ export const UPDATE_USER = gql`
       studentLevel
       colleges
       termsInAttendance
-      isNewTransfer
+      isTransfer
       reservedSeatGroups
     }
   }

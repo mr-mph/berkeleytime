@@ -22,9 +22,29 @@ export const updateUser = async (
   if (!context.user?._id) throw new Error("Unauthorized");
   const userId = context.user._id;
 
-  const updatedUser = await UserModel.findByIdAndUpdate(userId, user, {
-    new: true,
-  });
+  // Explicit $set so nullables (e.g. cleared termsInAttendance) persist.
+  const $set: Record<string, unknown> = {};
+  if (user.majors !== undefined && user.majors !== null) $set.majors = user.majors;
+  if (user.minors !== undefined && user.minors !== null) $set.minors = user.minors;
+  if (user.studentLevel !== undefined) $set.studentLevel = user.studentLevel;
+  if (user.colleges !== undefined && user.colleges !== null) {
+    $set.colleges = user.colleges;
+  }
+  if (user.termsInAttendance !== undefined) {
+    $set.termsInAttendance = user.termsInAttendance;
+  }
+  if (user.isTransfer !== undefined && user.isTransfer !== null) {
+    $set.isTransfer = user.isTransfer;
+  }
+  if (user.reservedSeatGroups !== undefined && user.reservedSeatGroups !== null) {
+    $set.reservedSeatGroups = user.reservedSeatGroups;
+  }
+
+  const updatedUser = await UserModel.findByIdAndUpdate(
+    userId,
+    { $set },
+    { new: true, runValidators: true }
+  );
 
   if (!updatedUser) throw new Error("Invalid");
 

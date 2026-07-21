@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { useMutation } from "@apollo/client/react";
 
+import { GetUserDocument } from "@/lib/generated/graphql";
 import {
   UpdateUserDocument,
   UpdateUserMutation,
@@ -15,10 +16,9 @@ export const useUpdateUser = () => {
       update(cache, { data }) {
         if (!data?.updateUser) return;
 
-        cache.modify({
-          fields: {
-            user: () => data.updateUser,
-          },
+        cache.writeQuery({
+          query: GetUserDocument,
+          data: { user: data.updateUser },
         });
       },
     }

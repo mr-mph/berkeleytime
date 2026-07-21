@@ -19,7 +19,7 @@ export const userTypeDef = gql`
     studentLevel: StudentLevel
     colleges: [String!]!
     termsInAttendance: Int
-    isNewTransfer: Boolean!
+    isTransfer: Boolean!
     reservedSeatGroups: [String!]!
   }
 
@@ -51,7 +51,7 @@ export const userTypeDef = gql`
     studentLevel: StudentLevel
     colleges: [String!]
     termsInAttendance: Int
-    isNewTransfer: Boolean
+    isTransfer: Boolean
     reservedSeatGroups: [String!]
   }
 
@@ -61,7 +61,7 @@ export const userTypeDef = gql`
     majors: [String!]
     minors: [String!]
     termsInAttendance: Int
-    isNewTransfer: Boolean
+    isTransfer: Boolean
   }
 
   type Mutation {

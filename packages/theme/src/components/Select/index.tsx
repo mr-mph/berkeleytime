@@ -216,6 +216,8 @@ export interface SelectProps<T> {
   emptyMessage?: string;
   customSearch?: (query: string, options: Option<T>[]) => Option<T>[];
   onSearchChange?: (query: string) => void;
+  /** Called when the dropdown opens or closes. */
+  onOpenChange?: (open: boolean) => void;
   tabs?: SelectTab<T>[];
   defaultTab?: string;
   tabValue?: string;
@@ -245,6 +247,7 @@ export function Select<T>({
   emptyMessage = "No results found.",
   customSearch,
   onSearchChange,
+  onOpenChange,
   tabs,
   defaultTab,
   tabValue,
@@ -270,12 +273,17 @@ export function Select<T>({
   // Tabs use the popover layout (same as searchable); search input is optional.
   const usesPopoverMenu = searchable || Boolean(tabs?.length);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
+
   useImperativeHandle(ref, () => ({
     focus: () => {
       triggerRef.current?.focus();
     },
     openMenu: () => {
-      setOpen(true);
+      handleOpenChange(true);
     },
   }));
 
@@ -542,7 +550,7 @@ export function Select<T>({
   // POPOVER MODE: Use Popover + Command (cmdk) for searchable and/or tabbed selects
   if (usesPopoverMenu) {
     return (
-      <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Root open={open} onOpenChange={handleOpenChange}>
         <Popover.Trigger asChild disabled={effectiveDisabled}>
           <Flex
             direction="row"
@@ -625,7 +633,7 @@ export function Select<T>({
 
   // NON-SEARCHABLE MODE: Use DropdownMenu
   return (
-    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+    <DropdownMenu.Root open={open} onOpenChange={handleOpenChange}>
       <DropdownMenu.Trigger asChild disabled={effectiveDisabled}>
         <Flex
           direction="row"

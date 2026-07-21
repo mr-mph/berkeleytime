@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Download, Filter, SortDown, SortUp } from "iconoir-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -99,14 +99,52 @@ export default function Filters() {
       ),
     [reservedSeatGroups, availableReservedSeatGroupSet]
   );
-  const reservedSeatGroupOptions = useMemo(
-    () =>
-      availableReservedSeatGroups.map((group) => ({
-        value: group,
-        label: group,
-      })),
-    [availableReservedSeatGroups]
-  );
+
+  // Freeze option order while the menu is open so picking doesn't jump rows.
+  // Re-pin selected groups to the top only when opening (or on page load).
+  const [reservedMenuOpen, setReservedMenuOpen] = useState(false);
+  const pinnedReservedOptionsRef = useRef<
+    { value: string; label: string }[] | null
+  >(null);
+
+  const buildReservedSeatGroupOptions = (
+    selected: string[],
+    available: string[]
+  ) => {
+    const selectedSet = new Set(selected);
+    return [
+      ...selected.map((group) => ({ value: group, label: group })),
+      ...available
+        .filter((group) => !selectedSet.has(group))
+        .map((group) => ({ value: group, label: group })),
+    ];
+  };
+
+  const reservedSeatGroupOptions = useMemo(() => {
+    if (reservedMenuOpen && pinnedReservedOptionsRef.current) {
+      return pinnedReservedOptionsRef.current;
+    }
+    return buildReservedSeatGroupOptions(
+      visibleReservedSeatGroups,
+      availableReservedSeatGroups
+    );
+  }, [
+    availableReservedSeatGroups,
+    reservedMenuOpen,
+    visibleReservedSeatGroups,
+  ]);
+
+  const handleReservedMenuOpenChange = (open: boolean) => {
+    if (open) {
+      pinnedReservedOptionsRef.current = buildReservedSeatGroupOptions(
+        visibleReservedSeatGroups,
+        availableReservedSeatGroups
+      );
+    } else {
+      pinnedReservedOptionsRef.current = null;
+    }
+    setReservedMenuOpen(open);
+  };
 
   const daysFromFilters = useMemo(() => {
     const next = [...EMPTY_DAYS];
@@ -537,8 +575,9 @@ export default function Filters() {
             multi
             searchable
             value={visibleReservedSeatGroups}
-            placeholder="Select groups that apply to you"
+            placeholder="Select groups that may apply to you"
             disabled={!availableReservedSeatGroups.length}
+            onOpenChange={handleReservedMenuOpenChange}
             onChange={(v) => {
               if (!Array.isArray(v)) return;
               // Keep selections that don't apply this term in localStorage.

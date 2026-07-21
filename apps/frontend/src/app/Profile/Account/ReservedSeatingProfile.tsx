@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useLazyQuery } from "@apollo/client/react";
 
+import { fuzzyFind } from "@repo/common";
+import { rankReservedSeatGroups } from "@repo/shared";
 import { Button, Checkbox, Input, Select } from "@repo/theme";
+import type { Option } from "@repo/theme";
 
 import { useUpdateUser } from "@/hooks/api";
 import useUser from "@/hooks/useUser";
@@ -48,12 +51,19 @@ export default function ReservedSeatingProfile() {
   const [majors, setMajors] = useState<string[]>([]);
   const [minors, setMinors] = useState<string[]>([]);
   const [termsInAttendance, setTermsInAttendance] = useState<string>("");
-  const [isNewTransfer, setIsNewTransfer] = useState(false);
+  const [isTransfer, setIsTransfer] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const hydratedUserIdRef = useRef<string | null>(null);
 
+  // Prefill from the saved account profile. Skip once the user has local edits
+  // so background UserProvider refetches don't wipe the form.
   useEffect(() => {
-    if (!user) return;
+    if (!user?._id) return;
+    if (isDirty && hydratedUserIdRef.current === user._id) return;
+    hydratedUserIdRef.current = user._id;
+
     setStudentLevel(user.studentLevel ?? null);
     setColleges(user.colleges ?? []);
     setMajors(user.majors ?? []);
@@ -61,9 +71,11 @@ export default function ReservedSeatingProfile() {
     setTermsInAttendance(
       user.termsInAttendance != null ? String(user.termsInAttendance) : ""
     );
-    setIsNewTransfer(Boolean(user.isNewTransfer));
+    setIsTransfer(Boolean(user.isTransfer));
     setSelectedGroups(user.reservedSeatGroups ?? []);
-  }, [user]);
+  }, [user, isDirty]);
+
+  const markDirty = () => setIsDirty(true);
 
   const [loadAllGroups, { data: allGroupsData, loading: loadingAll }] =
     useLazyQuery(GetAllReservedSeatGroupsDocument, {
@@ -84,18 +96,6 @@ export default function ReservedSeatingProfile() {
   const allGroups = allGroupsData?.allReservedSeatGroups ?? [];
   const suggestedGroups = suggestionsData?.suggestedReservedSeatGroups ?? [];
 
-  const groupOptions = useMemo(() => {
-    const suggestedSet = new Set(suggestedGroups);
-    const suggested = suggestedGroups.map((group) => ({
-      value: group,
-      label: group,
-    }));
-    const rest = allGroups
-      .filter((group) => !suggestedSet.has(group))
-      .map((group) => ({ value: group, label: group }));
-    return [...suggested, ...rest];
-  }, [allGroups, suggestedGroups]);
-
   const profileInput = useMemo(() => {
     const parsedTerms = Number.parseInt(termsInAttendance, 10);
     return {
@@ -104,7 +104,7 @@ export default function ReservedSeatingProfile() {
       majors,
       minors,
       termsInAttendance: Number.isFinite(parsedTerms) ? parsedTerms : null,
-      isNewTransfer,
+      isTransfer,
     };
   }, [
     studentLevel,
@@ -112,8 +112,66 @@ export default function ReservedSeatingProfile() {
     majors,
     minors,
     termsInAttendance,
-    isNewTransfer,
+    isTransfer,
   ]);
+
+  // Rank the full pool by closeness to year/college/major (not alphabetical).
+  const groupsByProfileCloseness = useMemo(
+    () => rankReservedSeatGroups(allGroups, profileInput),
+    [allGroups, profileInput]
+  );
+
+  const groupOptions = useMemo(() => {
+    const suggestedSet = new Set(suggestedGroups);
+    const selectedSet = new Set(selectedGroups);
+    const suggested = suggestedGroups.map((group) => ({
+      value: group,
+      label: group,
+    }));
+
+    // After suggestions: remaining groups by profile closeness, then any
+    // unscored leftovers last (opaque groups excluded by rank helper).
+    const rankedRest = groupsByProfileCloseness.filter(
+      (group) => !suggestedSet.has(group)
+    );
+    const rankedSet = new Set(rankedRest);
+    const leftovers = allGroups.filter(
+      (group) => !suggestedSet.has(group) && !rankedSet.has(group)
+    );
+
+    const selectedRest = rankedRest.filter((group) => selectedSet.has(group));
+    const unselectedRest = rankedRest.filter(
+      (group) => !selectedSet.has(group)
+    );
+
+    return [
+      ...suggested,
+      ...selectedRest.map((group) => ({ value: group, label: group })),
+      ...unselectedRest.map((group) => ({ value: group, label: group })),
+      ...leftovers.map((group) => ({ value: group, label: group })),
+    ];
+  }, [allGroups, groupsByProfileCloseness, selectedGroups, suggestedGroups]);
+
+  /** Filter by typed query while preserving profile-ranked order. */
+  const searchGroupOptions = useCallback(
+    (query: string, options: Option<string>[]) => {
+      const items = options.filter(
+        (opt): opt is { value: string; label: string } =>
+          "value" in opt && (opt as { type?: string }).type !== "label"
+      );
+      if (items.length === 0) return [];
+
+      const matching = new Set(
+        fuzzyFind(
+          query,
+          items.map((opt) => opt.label)
+        )
+      );
+
+      return items.filter((opt) => matching.has(opt.label));
+    },
+    []
+  );
 
   const handleUpdateSuggestions = async () => {
     setStatusMessage(null);
@@ -123,8 +181,8 @@ export default function ReservedSeatingProfile() {
     const suggested = result.data?.suggestedReservedSeatGroups ?? [];
     setSelectedGroups((prev) => {
       if (suggested.length === 0) return prev;
-      // Suggested list is already score-sorted (most similar first). Keep that
-      // order at the front; append any prior manual picks that weren't suggested.
+      markDirty();
+      // Suggested list is already score-sorted (most similar first).
       return [
         ...suggested,
         ...prev.filter((group) => !suggested.includes(group)),
@@ -132,7 +190,7 @@ export default function ReservedSeatingProfile() {
     });
     setStatusMessage(
       suggested.length > 0
-        ? `Added ${suggested.length} suggested group${suggested.length === 1 ? "" : "s"} (most similar first). Review and save.`
+        ? `Added ${suggested.length} group${suggested.length === 1 ? "" : "s"} that may apply (most similar first). Review and save.`
         : "No matching groups found — search the list below or adjust your profile."
     );
   };
@@ -140,15 +198,29 @@ export default function ReservedSeatingProfile() {
   const handleSave = async () => {
     setStatusMessage(null);
     const parsedTerms = Number.parseInt(termsInAttendance, 10);
-    await updateUser({
+    const result = await updateUser({
       studentLevel,
       colleges,
       majors,
       minors,
       termsInAttendance: Number.isFinite(parsedTerms) ? parsedTerms : null,
-      isNewTransfer,
+      isTransfer,
       reservedSeatGroups: selectedGroups,
     });
+    const saved = result.data?.updateUser;
+    if (saved) {
+      // Keep form aligned with what the server persisted.
+      setStudentLevel(saved.studentLevel ?? null);
+      setColleges(saved.colleges ?? []);
+      setMajors(saved.majors ?? []);
+      setMinors(saved.minors ?? []);
+      setTermsInAttendance(
+        saved.termsInAttendance != null ? String(saved.termsInAttendance) : ""
+      );
+      setIsTransfer(Boolean(saved.isTransfer));
+      setSelectedGroups(saved.reservedSeatGroups ?? []);
+      setIsDirty(false);
+    }
     setStatusMessage("Reserved seating profile saved.");
   };
 
@@ -167,9 +239,10 @@ export default function ReservedSeatingProfile() {
             value={studentLevel}
             placeholder="Select level"
             clearable
-            onChange={(value) =>
-              setStudentLevel((value as StudentLevel | null) ?? null)
-            }
+            onChange={(value) => {
+              markDirty();
+              setStudentLevel((value as StudentLevel | null) ?? null);
+            }}
             options={STUDENT_LEVEL_OPTIONS}
           />
         </div>
@@ -182,12 +255,14 @@ export default function ReservedSeatingProfile() {
             max={20}
             value={termsInAttendance}
             placeholder="e.g. 3"
-            onChange={(event) => setTermsInAttendance(event.target.value)}
+            onChange={(event) => {
+              markDirty();
+              setTermsInAttendance(event.target.value);
+            }}
           />
           <p className={styles.hint}>
-            0–2 terms matches &quot;New First Year Undergraduate&quot; pools (not
-            specialty programs like Freshman Edge). Use the transfer checkbox
-            instead if you are a new transfer.
+            0–2 terms matches &quot;new&quot; first-year or new-transfer pools
+            (not specialty programs like Freshman Edge).
           </p>
         </div>
 
@@ -199,7 +274,10 @@ export default function ReservedSeatingProfile() {
             value={colleges}
             placeholder="Select college(s)"
             onChange={(value) => {
-              if (Array.isArray(value)) setColleges(value);
+              if (Array.isArray(value)) {
+                markDirty();
+                setColleges(value);
+              }
             }}
             options={COLLEGE_OPTIONS}
             searchPlaceholder="Search colleges..."
@@ -214,7 +292,10 @@ export default function ReservedSeatingProfile() {
             value={majors}
             placeholder="Select major(s)"
             onChange={(value) => {
-              if (Array.isArray(value)) setMajors(value);
+              if (Array.isArray(value)) {
+                markDirty();
+                setMajors(value);
+              }
             }}
             options={MAJOR_OPTIONS}
             searchPlaceholder="Search majors..."
@@ -230,7 +311,10 @@ export default function ReservedSeatingProfile() {
             value={minors}
             placeholder="Select minor(s)"
             onChange={(value) => {
-              if (Array.isArray(value)) setMinors(value);
+              if (Array.isArray(value)) {
+                markDirty();
+                setMinors(value);
+              }
             }}
             options={MINOR_OPTIONS}
             searchPlaceholder="Search minors..."
@@ -240,10 +324,13 @@ export default function ReservedSeatingProfile() {
 
         <label className={styles.checkboxRow}>
           <Checkbox
-            checked={isNewTransfer}
-            onCheckedChange={(checked) => setIsNewTransfer(checked === true)}
+            checked={isTransfer}
+            onCheckedChange={(checked) => {
+              markDirty();
+              setIsTransfer(checked === true);
+            }}
           />
-          <span>I am a new transfer student</span>
+          <span>I am a transfer student</span>
         </label>
       </div>
 
@@ -253,12 +340,16 @@ export default function ReservedSeatingProfile() {
           onClick={() => void handleUpdateSuggestions()}
           disabled={loadingSuggestions}
         >
-          {loadingSuggestions ? "Finding groups…" : "Update suggestions"}
+          {loadingSuggestions
+            ? "Finding groups…"
+            : "Suggest groups that may apply"}
         </Button>
       </div>
 
       <div className={styles.formControl}>
-        <p className={styles.label}>Reserved seating groups that apply to you</p>
+        <p className={styles.label}>
+          Reserved seating groups that may apply to you
+        </p>
         <Select
           multi
           searchable
@@ -270,18 +361,21 @@ export default function ReservedSeatingProfile() {
           }
           disabled={loadingAll || allGroups.length === 0}
           onChange={(value) => {
-            if (Array.isArray(value)) setSelectedGroups(value);
+            if (Array.isArray(value)) {
+              markDirty();
+              setSelectedGroups(value);
+            }
           }}
           options={groupOptions}
+          customSearch={searchGroupOptions}
           searchPlaceholder="Search reserved groups..."
           emptyMessage="No reserved seat groups found."
           maxListHeight={280}
         />
         {suggestedGroups.length > 0 && (
           <p className={styles.hint}>
-            {suggestedGroups.length} suggested group
-            {suggestedGroups.length === 1 ? "" : "s"} listed first (most
-            similar at the top).
+            Suggested groups first, then others ranked by closeness to your
+            level / college / major. These are guesses — review before saving.
           </p>
         )}
       </div>
