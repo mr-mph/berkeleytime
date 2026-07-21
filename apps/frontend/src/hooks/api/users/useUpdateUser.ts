@@ -2,25 +2,35 @@ import { useCallback } from "react";
 
 import { useMutation } from "@apollo/client/react";
 
-import { IUserInput, UPDATE_USER, UpdateUserResponse } from "@/lib/api";
+import {
+  UpdateUserDocument,
+  UpdateUserMutation,
+  UpdateUserMutationVariables,
+} from "@/lib/generated/graphql";
 
 export const useUpdateUser = () => {
-  const mutation = useMutation<UpdateUserResponse>(UPDATE_USER, {
-    update(cache, { data }) {
-      if (!data?.updateUser) return;
+  const mutation = useMutation<UpdateUserMutation, UpdateUserMutationVariables>(
+    UpdateUserDocument,
+    {
+      update(cache, { data }) {
+        if (!data?.updateUser) return;
 
-      cache.modify({
-        fields: {
-          user: () => data.updateUser,
-        },
-      });
-    },
-  });
+        cache.modify({
+          fields: {
+            user: () => data.updateUser,
+          },
+        });
+      },
+    }
+  );
 
   const updateUser = useCallback(
     async (
-      user: Partial<IUserInput>,
-      options?: Omit<useMutation.Options<UpdateUserResponse>, "variables">
+      user: UpdateUserMutationVariables["user"],
+      options?: Omit<
+        useMutation.Options<UpdateUserMutation, UpdateUserMutationVariables>,
+        "variables"
+      >
     ) => {
       const mutate = mutation[0];
 

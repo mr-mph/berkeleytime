@@ -11,5 +11,10 @@ export const formatUser = (user: UserType): UserModule.User => {
     student: user.email.endsWith("@berkeley.edu"),
     majors: user.majors ? user.majors : [],
     minors: user.minors ? user.minors : [],
+    studentLevel: (user.studentLevel as UserModule.StudentLevel | null) ?? null,
+    colleges: user.colleges ? user.colleges : [],
+    termsInAttendance: user.termsInAttendance ?? null,
+    isNewTransfer: Boolean(user.isNewTransfer),
+    reservedSeatGroups: user.reservedSeatGroups ? user.reservedSeatGroups : [],
   };
 };

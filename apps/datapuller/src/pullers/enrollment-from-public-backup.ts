@@ -9,7 +9,7 @@ import { model, Schema } from "mongoose";
 
 import { Config } from "../shared/config";
 import {
-  syncCatalogEnrollmentForCurrentTerm,
+  syncCatalogEnrollmentForAllCatalogTerms,
   updateCatalogRmpRatings,
 } from "../lib/catalog-denormalize";
 import { syncCrosslistingEnrollmentFanout } from "./crosslisting-enrollment-fanout";
@@ -362,7 +362,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
     await updateCatalogRmpRatings(log);
 
     await syncCrosslistingEnrollmentFanout(config);
-    await syncCatalogEnrollmentForCurrentTerm(log);
+    await syncCatalogEnrollmentForAllCatalogTerms(log);
     await invalidateBackendCaches(config.BACKEND_URL, log);
 
     await PublicBackupSyncStatusModel.findOneAndUpdate(

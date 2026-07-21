@@ -4,6 +4,7 @@ export * from "./enrollmentCatalogRefresh";
 export * from "./lsBreadths";
 export * from "./metrics";
 export * from "./ratingsConfig";
+export * from "./reservedSeatGroupMatch";
 export * from "./rmp";
 export * from "./staff";
 export * from "./ucbCatalogEnrollment";

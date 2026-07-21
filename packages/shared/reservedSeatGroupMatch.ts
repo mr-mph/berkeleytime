@@ -1,0 +1,404 @@
+export type StudentLevel = "UNDERGRAD" | "MASTERS" | "PHD" | "GRADUATE";
+
+export type ReservedSeatProfile = {
+  studentLevel?: StudentLevel | null;
+  colleges?: string[] | null;
+  majors?: string[] | null;
+  minors?: string[] | null;
+  termsInAttendance?: number | null;
+  isNewTransfer?: boolean | null;
+};
+
+const OPAQUE_GROUP_PATTERNS = [
+  /enrollment permission/i,
+  /^students with enrollment permission$/i,
+];
+
+/** College → phrases that appear in SIS reserved-seat labels (keep specific). */
+const COLLEGE_ALIASES: Record<string, string[]> = {
+  Business: ["haas school of business", "haas", "business administration"],
+  Chemistry: ["college of chemistry"],
+  "Computing, Data Science & Society": [
+    "computing data science and society",
+    "cdss",
+  ],
+  Education: ["school of education", "education sciences"],
+  Engineering: ["college of engineering", "undeclared students in the coe"],
+  "Environmental Design": [
+    "college of environmental design",
+    "environmental design",
+  ],
+  Information: ["school of information", "information management"],
+  Journalism: ["journalism"],
+  Law: ["school of law"],
+  "Letters & Science": [
+    "college of letters and science",
+    "college of letters and sciences",
+    "letters and science",
+    "letters and sciences",
+    "l and s",
+    "undeclared students in the college of letters",
+  ],
+  "Natural Resources": [
+    "rausser college of natural resources",
+    "college of natural resources",
+    "natural resources",
+  ],
+  Optometry: ["optometry"],
+  "Public Health": ["public health", "school of public health"],
+  "Public Policy": ["goldman school of public policy", "public policy"],
+  "Social Welfare": ["social welfare"],
+};
+
+/**
+ * Major → SIS phrases. Do NOT add sibling majors (e.g. bare "computer science"
+ * on EECS) — that over-selects exclusive CS pools.
+ */
+const MAJOR_ALIASES: Record<string, string[]> = {
+  "Electrical Engineering & Computer Sciences (EECS)": [
+    "electrical engineering and computer sciences",
+    "electrical engineering and computer science",
+    "electrical and computer engineering",
+    "eecs",
+  ],
+  "Computer Science": [
+    "computer science ba",
+    "computer science majors",
+    "l and s computer science",
+    "computer science",
+  ],
+  "Data Science": ["data science"],
+  "Business Administration": ["business administration", "haas"],
+  "Molecular and Cell Biology": ["molecular and cell biology"],
+  "Integrative Biology": ["integrative biology"],
+  "Chicanx Latinx Studies": [
+    "chicano studies",
+    "chicanx latinx",
+    "chicanx latinX",
+  ],
+  "Film & Media": ["film majors", "film and media"],
+  "Art History": ["art history"],
+  "Art Practice": ["art practice"],
+  "Aerospace Engineering": ["aerospace engineering"],
+  "Mechanical Engineering": ["mechanical engineering"],
+  Bioengineering: ["bioengineering"],
+  "Civil Engineering": ["civil engineering"],
+  Statistics: ["statistics"],
+  English: ["english majors"],
+};
+
+const normalize = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9+]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isOpaqueGroup = (description: string): boolean =>
+  OPAQUE_GROUP_PATTERNS.some((pattern) => pattern.test(description));
+
+type TermsConstraint =
+  | { kind: "range"; min: number; max: number }
+  | { kind: "min"; min: number }
+  | null;
+
+const parseTermsConstraint = (description: string): TermsConstraint => {
+  const range = description.match(
+    /(\d+)\s*[-–]\s*(\d+)\s+terms?\s+in\s+attendance/i
+  );
+  if (range) {
+    return { kind: "range", min: Number(range[1]), max: Number(range[2]) };
+  }
+
+  const orMore = description.match(
+    /(\d+)\s*(?:\+|or more)\s*terms?\s+in\s+attendance/i
+  );
+  if (orMore) {
+    return { kind: "min", min: Number(orMore[1]) };
+  }
+
+  const plus = description.match(/(\d+)\+\s*terms?\s+in\s+attendance/i);
+  if (plus) {
+    return { kind: "min", min: Number(plus[1]) };
+  }
+
+  return null;
+};
+
+const termsMatch = (
+  description: string,
+  termsInAttendance: number | null | undefined
+): boolean | null => {
+  const constraint = parseTermsConstraint(description);
+  if (!constraint) return null;
+  if (termsInAttendance == null || Number.isNaN(termsInAttendance)) {
+    return false;
+  }
+  if (constraint.kind === "range") {
+    return (
+      termsInAttendance >= constraint.min &&
+      termsInAttendance <= constraint.max
+    );
+  }
+  return termsInAttendance >= constraint.min;
+};
+
+/** Generic "Students with N Terms in Attendance" pools (no major/college). */
+const isGenericTermsGroup = (description: string): boolean =>
+  /^students with \d+/i.test(description.trim()) &&
+  /terms?\s+in\s+attendance/i.test(description) &&
+  !/\bmajors?\b|\bminors?\b|college|graduate|undergraduate students:/i.test(
+    description
+  );
+
+const levelMatch = (
+  description: string,
+  level: StudentLevel | null | undefined
+): boolean | null => {
+  if (!level) return null;
+  const text = description.toLowerCase();
+  const hasUndergrad =
+    /\bundergraduate\b|\bfreshman\b|\bfirst year undergraduate\b/.test(text);
+  const hasMasters =
+    /\bmaster(?:'s)?\b|\bmasters\b|\bmfa\b|\bmph\b|\bmeng\b|\bm\.eng\b/.test(
+      text
+    );
+  const hasPhd = /\bphd\b|\bph\.d\b|\bdoctoral\b/.test(text);
+  const hasGraduate = /\bgraduate\b/.test(text) && !hasUndergrad;
+
+  const mentionsLevel = hasUndergrad || hasMasters || hasPhd || hasGraduate;
+  if (!mentionsLevel) return null;
+
+  switch (level) {
+    case "UNDERGRAD":
+      return hasUndergrad && !hasMasters && !hasPhd;
+    case "MASTERS":
+      return hasMasters || (hasGraduate && !hasPhd && !hasUndergrad);
+    case "PHD":
+      return hasPhd || (hasGraduate && !hasMasters && !hasUndergrad);
+    case "GRADUATE":
+      return hasGraduate || hasMasters || hasPhd;
+    default:
+      return null;
+  }
+};
+
+const isTransferGroup = (description: string): boolean =>
+  /\btransfers?\b/i.test(description);
+
+const isNewStudentGroup = (description: string): boolean =>
+  /\bnew (?:first year )?undergraduate\b|\bnew freshman\b|\bfreshmen\b/i.test(
+    description
+  );
+
+/**
+ * Word-boundary alias hit on normalized text. Skips matches preceded by "non"
+ * so "Non-EECS" does not match alias "eecs". Short "eecs" also ignores joint
+ * program forms like "EECS/MSE" (slash compounds).
+ */
+const descriptionHasAlias = (
+  description: string,
+  alias: string
+): boolean => {
+  const normalizedAlias = normalize(alias);
+  if (normalizedAlias.length < 3) return false;
+
+  // Standalone EECS only — not EECS/MSE joint tokens.
+  if (normalizedAlias === "eecs") {
+    return /\beecs\b(?!\s*\/)/i.test(description) && !/\bnon[- ]eecs\b/i.test(description);
+  }
+
+  const normalizedDescription = normalize(description);
+  const padded = ` ${normalizedDescription} `;
+  const token = ` ${normalizedAlias} `;
+  let from = 0;
+  while (from < padded.length) {
+    const idx = padded.indexOf(token, from);
+    if (idx < 0) return false;
+    const before = padded.slice(0, idx).trimEnd();
+    if (before.endsWith(" non") || before.endsWith(" non-")) {
+      from = idx + token.length;
+      continue;
+    }
+    return true;
+  }
+  return false;
+};
+
+const aliasesFor = (
+  value: string,
+  aliasMap: Record<string, string[]>
+): string[] => {
+  const curated = aliasMap[value];
+  // When curated aliases exist, do NOT also match the short display name
+  // ("Engineering" ⊂ "Civil Engineering Majors").
+  if (curated && curated.length > 0) {
+    return [...curated];
+  }
+  return [
+    value,
+    value.replace(/&/g, " and "),
+    value.replace(/\band\b/gi, "&"),
+  ].filter(Boolean);
+};
+
+const aliasHits = (
+  description: string,
+  values: string[],
+  aliasMap: Record<string, string[]>
+): number => {
+  let hits = 0;
+  for (const value of values) {
+    const aliases = aliasesFor(value, aliasMap);
+    aliases.sort((a, b) => normalize(b).length - normalize(a).length);
+    for (const alias of aliases) {
+      if (descriptionHasAlias(description, alias)) {
+        hits += 1;
+        break;
+      }
+    }
+  }
+  return hits;
+};
+
+/** Other CoE majors — college-wide match should not pull these in for EECS/etc. */
+const OTHER_SPECIFIC_MAJOR_MARKERS =
+  /\b(mechanical engineering|civil engineering|bioengineering|aerospace engineering|industrial engineering(?: and operations research)?|environmental engineering|nuclear engineering|materials science|engineering physics|engineering science|chemical engineering)\b/i;
+
+const isCollegeWideOnlyConflict = (
+  description: string,
+  majorHits: number,
+  minorHits: number
+): boolean =>
+  majorHits === 0 &&
+  minorHits === 0 &&
+  OTHER_SPECIFIC_MAJOR_MARKERS.test(description);
+
+/** Group names a specific exclusive major that conflicts with the user's majors. */
+const exclusiveMajorConflict = (
+  description: string,
+  majors: string[]
+): boolean => {
+  const norm = normalize(description);
+  const hasEecs = majors.some((m) => /eecs|electrical engineering/i.test(m));
+  const hasCs = majors.some((m) => /^computer science$/i.test(m.trim()));
+
+  // Pure CS BA pool should not apply to EECS-only profiles.
+  if (
+    hasEecs &&
+    !hasCs &&
+    /\bcomputer science ba\b|\bstudents declared in the computer science\b/.test(
+      norm
+    ) &&
+    !/\beecs\b|\belectrical engineering\b/.test(norm)
+  ) {
+    return true;
+  }
+
+  // Explicit Non-EECS pools for EECS majors.
+  if (hasEecs && /\bnon eecs\b/.test(norm)) {
+    return true;
+  }
+
+  return false;
+};
+
+export type ReservedSeatGroupScore = {
+  description: string;
+  score: number;
+};
+
+/**
+ * Rank reserved-seat requirement-group descriptions against an academic profile.
+ * Opaque permission-only groups are never suggested.
+ * Level alone is never enough — need major/college/terms/transfer specificity.
+ */
+export const scoreReservedSeatGroups = (
+  descriptions: string[],
+  profile: ReservedSeatProfile
+): ReservedSeatGroupScore[] => {
+  const colleges = profile.colleges?.filter(Boolean) ?? [];
+  const majors = profile.majors?.filter(Boolean) ?? [];
+  const minors = profile.minors?.filter(Boolean) ?? [];
+  const isNewTransfer = Boolean(profile.isNewTransfer);
+  const terms = profile.termsInAttendance;
+
+  const scored: ReservedSeatGroupScore[] = [];
+
+  for (const description of descriptions) {
+    if (!description || isOpaqueGroup(description)) continue;
+
+    let score = 0;
+    let hardFail = false;
+
+    const transfer = isTransferGroup(description);
+    if (transfer && !isNewTransfer) {
+      hardFail = true;
+    } else if (transfer && isNewTransfer) {
+      score += 40;
+    }
+
+    if (isNewStudentGroup(description) && terms != null && terms > 2) {
+      hardFail = true;
+    }
+
+    if (exclusiveMajorConflict(description, majors)) {
+      hardFail = true;
+    }
+
+    // Declared majors shouldn't get undeclared-only pools.
+    if (
+      majors.length > 0 &&
+      /\bundeclared students\b/i.test(description) &&
+      !aliasHits(description, majors, MAJOR_ALIASES)
+    ) {
+      hardFail = true;
+    }
+
+    const level = levelMatch(description, profile.studentLevel);
+    if (level === false) hardFail = true;
+    if (level === true) score += 10; // small bonus only
+
+    const termsOk = termsMatch(description, terms);
+    if (termsOk === false) hardFail = true;
+    if (termsOk === true) score += 30;
+
+    const collegeHits = aliasHits(description, colleges, COLLEGE_ALIASES);
+    const majorHits = aliasHits(description, majors, MAJOR_ALIASES);
+    const minorHits = aliasHits(description, minors, MAJOR_ALIASES);
+
+    // College hit on a Mechanical/Civil/... pool is not a real match for EECS.
+    const collegeCounts =
+      collegeHits > 0 &&
+      !isCollegeWideOnlyConflict(description, majorHits, minorHits);
+
+    score += (collegeCounts ? collegeHits : 0) * 20;
+    score += majorHits * 40;
+    score += minorHits * 30;
+
+    const genericTerms = isGenericTermsGroup(description) && termsOk === true;
+    if (genericTerms) score += 25;
+
+    // Must have a specific hook — not undergrad-only noise.
+    const hasSpecificSignal =
+      majorHits > 0 ||
+      minorHits > 0 ||
+      collegeCounts ||
+      genericTerms ||
+      (transfer && isNewTransfer && (majorHits > 0 || collegeCounts));
+
+    if (hardFail || !hasSpecificSignal || score <= 0) continue;
+    scored.push({ description, score });
+  }
+
+  return scored.sort(
+    (a, b) => b.score - a.score || a.description.localeCompare(b.description)
+  );
+};
+
+export const suggestReservedSeatGroups = (
+  descriptions: string[],
+  profile: ReservedSeatProfile
+): string[] =>
+  scoreReservedSeatGroups(descriptions, profile).map((item) => item.description);

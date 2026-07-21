@@ -1,6 +1,13 @@
 import { gql } from "graphql-tag";
 
 export const userTypeDef = gql`
+  enum StudentLevel {
+    UNDERGRAD
+    MASTERS
+    PHD
+    GRADUATE
+  }
+
   type User @cacheControl(scope: PRIVATE) {
     _id: ID!
     email: String!
@@ -9,6 +16,11 @@ export const userTypeDef = gql`
     student: Boolean!
     majors: [String!]!
     minors: [String!]!
+    studentLevel: StudentLevel
+    colleges: [String!]!
+    termsInAttendance: Int
+    isNewTransfer: Boolean!
+    reservedSeatGroups: [String!]!
   }
 
   """
@@ -36,6 +48,20 @@ export const userTypeDef = gql`
   input UpdateUserInput {
     majors: [String!]
     minors: [String!]
+    studentLevel: StudentLevel
+    colleges: [String!]
+    termsInAttendance: Int
+    isNewTransfer: Boolean
+    reservedSeatGroups: [String!]
+  }
+
+  input ReservedSeatProfileInput {
+    studentLevel: StudentLevel
+    colleges: [String!]
+    majors: [String!]
+    minors: [String!]
+    termsInAttendance: Int
+    isNewTransfer: Boolean
   }
 
   type Mutation {

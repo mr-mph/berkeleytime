@@ -23,7 +23,8 @@ import {
   SectionModel,
   TermModel,
 } from "@repo/common/models";
-import { isLsBreadthRequirement } from "@repo/shared";
+import { isLsBreadthRequirement, suggestReservedSeatGroups } from "@repo/shared";
+import type { ReservedSeatProfile } from "@repo/shared";
 
 import { getFields, hasFieldPath } from "../../utils/graphql";
 import { searchSemantic } from "../semantic-search/client";
@@ -751,7 +752,8 @@ export const getCatalogFilterOptions = async (
         },
       },
     ]),
-    // Only groups with ≥1 class that still has open reserved seats this term
+    // All reserved groups that appear on this term (open or full). Identity
+    // selection and "Reserved Seats (For You)" need full pools too.
     CatalogClassModel.aggregate([
       {
         $match: {
@@ -767,12 +769,7 @@ export const getCatalogFilterOptions = async (
             $type: "string",
             $nin: ["", "Unknown"],
           },
-          $expr: {
-            $lt: [
-              "$seatReservations.enrolledCount",
-              "$seatReservations.maxEnroll",
-            ],
-          },
+          "seatReservations.maxEnroll": { $gt: 1 },
         },
       },
       {
@@ -841,6 +838,42 @@ export const getCatalogFilterOptions = async (
     semesters: semesterList,
     timeRange,
   };
+};
+
+/** Distinct reserved-seat groups across every catalog term. */
+export const getAllReservedSeatGroups = async (): Promise<string[]> => {
+  const agg = await CatalogClassModel.aggregate<{
+    reservedSeatGroups: string[];
+  }>([
+    { $match: { "seatReservations.0": { $exists: true } } },
+    { $unwind: "$seatReservations" },
+    {
+      $match: {
+        "seatReservations.description": {
+          $type: "string",
+          $nin: ["", "Unknown"],
+        },
+        "seatReservations.maxEnroll": { $gt: 1 },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        reservedSeatGroups: { $addToSet: "$seatReservations.description" },
+      },
+    },
+  ]);
+
+  return ((agg[0]?.reservedSeatGroups as string[] | undefined) ?? [])
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+};
+
+export const getSuggestedReservedSeatGroups = async (
+  profile: ReservedSeatProfile
+): Promise<string[]> => {
+  const allGroups = await getAllReservedSeatGroups();
+  return suggestReservedSeatGroups(allGroups, profile);
 };
 
 const EMPTY_GRADE_DISTRIBUTIONS: readonly IGradeDistributionItem[] =

@@ -925,6 +925,46 @@ export const syncCatalogEnrollmentForCurrentTerm = async (
 };
 
 /**
+ * Sync enrollment (including reserved seats) onto catalog_classes for every
+ * term that has catalog rows. Needed after public-backup merges, which restore
+ * catalog without denormalized seatReservations for past terms.
+ */
+export const syncCatalogEnrollmentForAllCatalogTerms = async (
+  log: Config["log"]
+) => {
+  const terms = await CatalogClassModel.aggregate<{
+    year: number;
+    semester: string;
+  }>([
+    {
+      $group: {
+        _id: { year: "$year", semester: "$semester" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        year: "$_id.year",
+        semester: "$_id.semester",
+      },
+    },
+    { $sort: { year: -1, semester: 1 } },
+  ]);
+
+  if (terms.length === 0) {
+    log.warn("No catalog terms found; skipping catalog enrollment sync");
+    return;
+  }
+
+  log.info(
+    `Syncing catalog enrollment from histories for ${terms.length} term(s)`
+  );
+  for (const term of terms) {
+    await syncCatalogEnrollmentFromHistories(log, term.year, term.semester);
+  }
+};
+
+/**
  * Updates only the enrollment fields on catalog_classes for sections that changed.
  * Much cheaper than a full rebuild - used by the enrollment puller.
  */

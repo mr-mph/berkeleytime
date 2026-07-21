@@ -11,6 +11,7 @@ import { signOut } from "@/lib/api";
 import profileStyles from "../Profile.module.scss";
 import styles from "./Account.module.scss";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
+import ReservedSeatingProfile from "./ReservedSeatingProfile";
 
 export default function Account() {
   const { user } = useUser();
@@ -56,6 +57,11 @@ export default function Account() {
               Delete Account
             </Button>
           </div>
+        </div>
+
+        <div className={profileStyles.section}>
+          <h2 className={profileStyles.sectionTitle}>Reserved seating</h2>
+          <ReservedSeatingProfile />
         </div>
       </div>
       <DeleteAccountDialog

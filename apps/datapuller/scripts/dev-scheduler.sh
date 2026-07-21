@@ -3,8 +3,8 @@
 # Intervals:
 #   enrollments (SIS)                    disabled locally (needs SIS API keys)
 #   ucb-catalog-enrollments              disabled (UC Berkeley IT request)
+#   SIS catalog (terms/courses/…)        disabled (avoid gateway.api.berkeley.edu load)
 #   enrollment-from-public-backup        hourly (public daily backup @ 05:00 PT)
-#   catalog refresh set                  every 12 hours
 #   daily extras                         every 24 hours
 
 set -eu
@@ -51,25 +51,27 @@ echo "Datapuller dev scheduler started."
   done
 ) &
 
-# Active catalog data: twice daily (staggered start).
+# Active catalog data via SIS (disabled — hits gateway.api.berkeley.edu/sis).
+# Roughly ~1k–3k HTTP requests per cycle: courses ~200–400; sections/classes
+# ~hundreds per UGRD current/future term (paginated 50 pages × 50 items at a time).
 # After terms + courses, seed the draft Spring 2027 schedule (idempotent) so
 # local/dev has tentative offerings before SIS opens for that term.
-(
-  sleep 30
-  while true; do
-    run_puller terms-nearby
-    run_puller courses
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Importing draft Spring 2027 schedule..."
-    if npx tsx /datapuller/scripts/import-draft-schedule.ts; then
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import finished"
-    else
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import failed (will retry next cycle)"
-    fi
-    run_puller sections-active
-    run_puller classes-active
-    sleep 43200
-  done
-) &
+# (
+#   sleep 30
+#   while true; do
+#     run_puller terms-nearby
+#     run_puller courses
+#     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Importing draft Spring 2027 schedule..."
+#     if npx tsx /datapuller/scripts/import-draft-schedule.ts; then
+#       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import finished"
+#     else
+#       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import failed (will retry next cycle)"
+#     fi
+#     run_puller sections-active
+#     run_puller classes-active
+#     sleep 43200
+#   done
+# ) &
 
 # Daily extras (DeCals, recent grades, enrollment windows, RMP, ASSIST)
 (

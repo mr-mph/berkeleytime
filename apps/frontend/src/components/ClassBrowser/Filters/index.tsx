@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { Filter, SortDown, SortUp } from "iconoir-react";
-import { useNavigate } from "react-router-dom";
+import { Download, Filter, SortDown, SortUp } from "iconoir-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   EECS_REQUIREMENT_OPTIONS,
@@ -14,9 +14,11 @@ import {
   Input,
   Select,
   Slider,
+  Tooltip,
 } from "@repo/theme";
 import type { Option, SelectTab } from "@repo/theme";
 
+import useUser from "@/hooks/useUser";
 import { sortByTermDescending } from "@/lib/classes";
 
 import {
@@ -45,6 +47,7 @@ const REQUIREMENT_TABS = {
 
 export default function Filters() {
   const { mode, setExpanded } = useLayoutContext();
+  const { user } = useUser();
 
   const {
     units,
@@ -80,23 +83,30 @@ export default function Filters() {
   } = useFilterContext();
 
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Drop identity selections that have no open reserved seats this term
-  useEffect(() => {
-    const available = filterOptions?.reservedSeatGroups;
-    if (!available) return;
-    const availableSet = new Set(available);
-    const pruned = reservedSeatGroups.filter((group) =>
-      availableSet.has(group)
-    );
-    if (pruned.length !== reservedSeatGroups.length) {
-      updateReservedSeatGroups(pruned);
-    }
-  }, [
-    filterOptions?.reservedSeatGroups,
-    reservedSeatGroups,
-    updateReservedSeatGroups,
-  ]);
+  const availableReservedSeatGroups = filterOptions?.reservedSeatGroups ?? [];
+  const availableReservedSeatGroupSet = useMemo(
+    () => new Set(availableReservedSeatGroups),
+    [availableReservedSeatGroups]
+  );
+  // Dropdown only shows groups available this term; identity in localStorage
+  // can still include groups from other terms.
+  const visibleReservedSeatGroups = useMemo(
+    () =>
+      reservedSeatGroups.filter((group) =>
+        availableReservedSeatGroupSet.has(group)
+      ),
+    [reservedSeatGroups, availableReservedSeatGroupSet]
+  );
+  const reservedSeatGroupOptions = useMemo(
+    () =>
+      availableReservedSeatGroups.map((group) => ({
+        value: group,
+        label: group,
+      })),
+    [availableReservedSeatGroups]
+  );
 
   const daysFromFilters = useMemo(() => {
     const next = [...EMPTY_DAYS];
@@ -331,9 +341,10 @@ export default function Filters() {
                 (term) => `${term.semester} ${term.year}` === value
               );
               if (selectedTerm) {
-                navigate(
-                  `/catalog/${selectedTerm.year}/${selectedTerm.semester}`
-                );
+                navigate({
+                  pathname: `/catalog/${selectedTerm.year}/${selectedTerm.semester}`,
+                  search: location.search,
+                });
               }
             }}
             options={availableTerms.map((term) => ({
@@ -491,20 +502,52 @@ export default function Filters() {
           />
         </div>
         <div className={styles.formControl}>
-          <p className={styles.label}>Reserved seating</p>
+          <div className={styles.filtersHeader} style={{ marginBottom: 8 }}>
+            <p className={styles.label} style={{ marginBottom: 0 }}>
+              Reserved seating
+            </p>
+            <Tooltip
+              content={
+                !user
+                  ? "Sign in to load from profile"
+                  : !(user.reservedSeatGroups?.length > 0)
+                    ? "Set up reserved seating on your Account page"
+                    : "Load from Profile"
+              }
+              trigger={
+                <span>
+                  <IconButton
+                    type="button"
+                    aria-label="Load reserved seating from profile"
+                    disabled={
+                      !user || !(user.reservedSeatGroups?.length > 0)
+                    }
+                    onClick={() => {
+                      if (!user?.reservedSeatGroups?.length) return;
+                      updateReservedSeatGroups(user.reservedSeatGroups);
+                    }}
+                  >
+                    <Download width={16} height={16} />
+                  </IconButton>
+                </span>
+              }
+            />
+          </div>
           <Select
             multi
             searchable
-            value={reservedSeatGroups}
+            value={visibleReservedSeatGroups}
             placeholder="Select groups that apply to you"
-            disabled={!filterOptions?.reservedSeatGroups?.length}
+            disabled={!availableReservedSeatGroups.length}
             onChange={(v) => {
-              if (Array.isArray(v)) updateReservedSeatGroups(v);
+              if (!Array.isArray(v)) return;
+              // Keep selections that don't apply this term in localStorage.
+              const preserved = reservedSeatGroups.filter(
+                (group) => !availableReservedSeatGroupSet.has(group)
+              );
+              updateReservedSeatGroups([...preserved, ...v]);
             }}
-            options={(filterOptions?.reservedSeatGroups ?? []).map((group) => ({
-              value: group,
-              label: group,
-            }))}
+            options={reservedSeatGroupOptions}
             searchPlaceholder="Search reserved groups..."
             emptyMessage="No reserved seat groups for this term."
             maxListHeight={200}

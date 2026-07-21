@@ -1,11 +1,15 @@
 import type { GraphQLResolveInfo } from "graphql";
 
+import type { ReservedSeatProfile } from "@repo/shared";
+
 import {
   type CatalogQueryParams,
+  getAllReservedSeatGroups,
   getCatalogClassIdentities,
   getCatalogFilterOptions,
   getCatalogLegacy,
   getCatalogSearch,
+  getSuggestedReservedSeatGroups,
 } from "./controller";
 
 const resolvers = {
@@ -32,6 +36,15 @@ const resolvers = {
       { year, semester }: { year: number; semester: string }
     ) => {
       return await getCatalogFilterOptions(year, semester);
+    },
+    allReservedSeatGroups: async () => {
+      return await getAllReservedSeatGroups();
+    },
+    suggestedReservedSeatGroups: async (
+      _: unknown,
+      { profile }: { profile: ReservedSeatProfile }
+    ) => {
+      return await getSuggestedReservedSeatGroups(profile);
     },
   },
 };

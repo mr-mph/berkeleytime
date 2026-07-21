@@ -102,6 +102,18 @@ export const GET_CATALOG_FILTER_OPTIONS = gql`
   }
 `;
 
+export const GET_ALL_RESERVED_SEAT_GROUPS = gql`
+  query GetAllReservedSeatGroups {
+    allReservedSeatGroups
+  }
+`;
+
+export const GET_SUGGESTED_RESERVED_SEAT_GROUPS = gql`
+  query GetSuggestedReservedSeatGroups($profile: ReservedSeatProfileInput!) {
+    suggestedReservedSeatGroups(profile: $profile)
+  }
+`;
+
 export type ICatalogResult = NonNullable<
   GetCatalogSearchQuery["catalogSearch"]
 >;

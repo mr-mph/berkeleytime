@@ -1,8 +1,12 @@
 import { gql } from "@apollo/client";
 
-import { GetUserQuery } from "../generated/graphql";
+import {
+  GetUserQuery,
+  UpdateUserMutationVariables,
+} from "../generated/graphql";
 
 export type IUser = GetUserQuery["user"];
+export type IUserInput = UpdateUserMutationVariables["user"];
 
 export const READ_USER = gql`
   query GetUser {
@@ -11,6 +15,13 @@ export const READ_USER = gql`
       email
       name
       student
+      majors
+      minors
+      studentLevel
+      colleges
+      termsInAttendance
+      isNewTransfer
+      reservedSeatGroups
     }
   }
 `;
@@ -22,6 +33,13 @@ export const UPDATE_USER = gql`
       name
       email
       student
+      majors
+      minors
+      studentLevel
+      colleges
+      termsInAttendance
+      isNewTransfer
+      reservedSeatGroups
     }
   }
 `;

@@ -249,5 +249,16 @@ export const catalogTypeDef = gql`
     ): [CatalogClassIdentity!]!
 
     catalogFilterOptions(year: Int!, semester: Semester!): CatalogFilterOptions!
+
+    "Distinct reserved-seat requirement groups across all catalog terms."
+    allReservedSeatGroups: [String!]!
+
+    """
+    Ranked reserved-seat groups that likely match the given academic profile.
+    Requires auth. Opaque groups (e.g. enrollment permission) are excluded.
+    """
+    suggestedReservedSeatGroups(
+      profile: ReservedSeatProfileInput!
+    ): [String!]! @auth
   }
 `;

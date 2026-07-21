@@ -34,6 +34,34 @@ export const userSchema = new Schema(
       type: [String],
       trim: true,
       required: false,
+      default: [],
+    },
+    studentLevel: {
+      type: String,
+      enum: ["UNDERGRAD", "MASTERS", "PHD", "GRADUATE"],
+      required: false,
+      default: null,
+    },
+    colleges: {
+      type: [String],
+      required: false,
+      default: [],
+    },
+    termsInAttendance: {
+      type: Number,
+      required: false,
+      default: null,
+      min: 0,
+    },
+    isNewTransfer: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
+    reservedSeatGroups: {
+      type: [String],
+      required: false,
+      default: [],
     },
     lastSeenAt: {
       type: Date,

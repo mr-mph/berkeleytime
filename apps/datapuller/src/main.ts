@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 
 import {
-  syncCatalogEnrollmentForCurrentTerm,
+  syncCatalogEnrollmentForAllCatalogTerms,
   updateCatalogGradeSummaries,
 } from "./lib/catalog-denormalize";
 import articulationsPuller from "./pullers/articulations";
@@ -52,7 +52,7 @@ const pullerMap: {
   "catalog-sync-grades": async (config: Config) =>
     updateCatalogGradeSummaries(config.log),
   "catalog-sync-enrollment": async (config: Config) => {
-    await syncCatalogEnrollmentForCurrentTerm(config.log);
+    await syncCatalogEnrollmentForAllCatalogTerms(config.log);
     const url = new URL("/api/cache/invalidate-catalog", config.BACKEND_URL);
     const response = await fetch(url, {
       method: "POST",
