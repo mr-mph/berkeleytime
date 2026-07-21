@@ -17,7 +17,6 @@ import {
 
 import COLLEGES from "../../GradTrak/Onboarding/AddColleges/colleges.json";
 import DEGREES from "../../GradTrak/Onboarding/AddDegree/degree-programs-types.json";
-
 import styles from "./Account.module.scss";
 
 const STUDENT_LEVEL_OPTIONS = [
@@ -106,14 +105,7 @@ export default function ReservedSeatingProfile() {
       termsInAttendance: Number.isFinite(parsedTerms) ? parsedTerms : null,
       isTransfer,
     };
-  }, [
-    studentLevel,
-    colleges,
-    majors,
-    minors,
-    termsInAttendance,
-    isTransfer,
-  ]);
+  }, [studentLevel, colleges, majors, minors, termsInAttendance, isTransfer]);
 
   // Rank the full pool by closeness to year/college/major (not alphabetical).
   const groupsByProfileCloseness = useMemo(
@@ -374,8 +366,7 @@ export default function ReservedSeatingProfile() {
         />
         {suggestedGroups.length > 0 && (
           <p className={styles.hint}>
-            Suggested groups first, then others ranked by closeness to your
-            level / college / major. These are guesses — review before saving.
+            These are guesses. Review before saving.
           </p>
         )}
       </div>
