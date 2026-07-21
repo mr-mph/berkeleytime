@@ -26,7 +26,9 @@ const BACKUP_LOOKBACK_DAYS = 3;
 
 /**
  * Never touch local user / private state, even if a future public dump includes them.
- * Restore uses --mode=upsert (replace matching _ids; insert missing).
+ * Restore uses --drop on collections present in the archive (excluded / absent
+ * collections are left alone). Local-owned collections are snapshotted first
+ * and put back afterward.
  *
  * Also never overwrite locally-owned enrichment datasets that we pull ourselves:
  * - rmp_professors: Rate My Professors cache
@@ -309,12 +311,10 @@ const downloadBackup = async (
 };
 
 /**
- * Merge the public dump into local Mongo.
- * - --mode=upsert: insert new docs; replace matching _ids from the backup
- *   (avoids E11000 spam from insert-only merges against an already-seeded DB).
- * - No --drop: local-only docs not in the dump are left alone.
- * - User/private collections are excluded; local-owned collections are also
- *   snapshotted and restored around this call.
+ * Replace public collections from the dump into local Mongo.
+ * - --drop: drop each restored collection first (no E11000 spam; full refresh).
+ * - Collections not in the archive / nsExclude'd are untouched.
+ * - Local-owned collections are snapshotted and restored around this call.
  */
 const mergePublicBackup = async (
   archivePath: string,
@@ -325,12 +325,12 @@ const mergePublicBackup = async (
     `--uri=${mongoUri}`,
     "--gzip",
     `--archive=${archivePath}`,
-    "--mode=upsert",
+    "--drop",
     "--nsInclude=bt.*",
     ...NS_EXCLUDE.flatMap((ns) => ["--nsExclude", ns]),
   ];
   log.info(
-    "Merging public backup into local DB (upsert by _id; skip excluded namespaces)"
+    "Restoring public backup into local DB (--drop collections in archive; skip excluded namespaces)"
   );
   const result = await runCommand("mongorestore", args, log);
   if (result.code !== 0) {
@@ -421,7 +421,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: etag,
           lastRestoredAt: new Date(),
-          message: `Upserted public backup ${dateKey}; preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
+          message: `Restored public backup ${dateKey} (--drop); preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
         },
       },
       { upsert: true }
