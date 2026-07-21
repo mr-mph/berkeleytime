@@ -45,8 +45,16 @@ const NS_EXCLUDE = [
   "bt.ucb_enrollment_scrape_statuses",
 ] as const;
 
-/** Collections we snapshot before restore and always put back afterward. */
-const LOCAL_OWNED_COLLECTIONS = ["rmp_professors", "articulations"] as const;
+/**
+ * Collections we snapshot before restore and always put back afterward.
+ * Belt-and-suspenders with NS_EXCLUDE — even if exclude/filtering fails, these
+ * local collections are restored from the pre-merge snapshot.
+ */
+const LOCAL_OWNED_COLLECTIONS = [
+  "users",
+  "rmp_professors",
+  "articulations",
+] as const;
 
 const SYNC_STATUS_KEY = "public-backup-sync";
 
@@ -338,7 +346,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
     await downloadBackup(url, archivePath, log);
     await mergePublicBackup(archivePath, config.mongoDB.uri, log);
 
-    // Guarantee RMP + ASSIST collections survive even if exclude/filtering fails.
+    // Guarantee users + RMP + ASSIST survive even if exclude/filtering fails.
     await restoreLocalOwnedSnapshots(
       config.mongoDB.uri,
       localSnapshots,
@@ -360,7 +368,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: head.etag,
           lastRestoredAt: new Date(),
-          message: `Merged public backup ${dateKey}; preserved rmp_professors + articulations; refreshed catalog RMP`,
+          message: `Merged public backup ${dateKey}; preserved users + rmp_professors + articulations; refreshed catalog RMP`,
         },
       },
       { upsert: true }

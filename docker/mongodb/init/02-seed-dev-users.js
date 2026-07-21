@@ -1,8 +1,5 @@
 // Seed local-only accounts for the DevAuthBanner user switcher.
-// Clears existing users first so the switcher only shows these accounts.
-
-// db.users.deleteMany({});
-// print("Cleared existing users.");
+// Idempotent: upserts by email so re-runs / post-restore seeding keep existing _ids.
 
 const now = new Date();
 
@@ -28,12 +25,18 @@ const seedUsers = [
 ];
 
 for (const user of seedUsers) {
-  const result = db.users.insertOne({
-    googleId: user.googleId,
-    email: user.email,
-    name: user.name,
-    staff: user.staff,
-    lastSeenAt: now,
-  });
-  print(`Dev user ready: ${user.name} <${user.email}> (${result.insertedId})`);
+  const result = db.users.findOneAndUpdate(
+    { email: user.email },
+    {
+      $setOnInsert: {
+        googleId: user.googleId,
+        email: user.email,
+        name: user.name,
+        staff: user.staff,
+        lastSeenAt: now,
+      },
+    },
+    { upsert: true, returnDocument: "after" }
+  );
+  print(`Dev user ready: ${result.name} <${result.email}> (${result._id})`);
 }

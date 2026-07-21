@@ -150,10 +150,13 @@ seed_database() {
   [[ -n "$mongo_container_id" ]] || die "MongoDB container not found. Is Docker Compose running?"
 
   docker cp "./$backup_file" "${mongo_container_id}:/tmp/prod-backup.gz"
-  docker exec "$mongo_container_id" mongorestore --drop --gzip --archive=/tmp/prod-backup.gz
+  # Preserve local users across restore (public dumps omit them; private dumps must not clobber).
+  docker exec "$mongo_container_id" mongorestore --drop --gzip \
+    --archive=/tmp/prod-backup.gz \
+    --nsExclude=bt.users
   docker cp "./docker/mongodb/init/02-seed-dev-users.js" "${mongo_container_id}:/tmp/02-seed-dev-users.js"
   docker exec "$mongo_container_id" mongosh bt /tmp/02-seed-dev-users.js
-  log "MongoDB restore complete."
+  log "MongoDB restore complete (users collection preserved / re-seeded)."
 }
 
 parse_args() {
