@@ -4,8 +4,7 @@
 
 - filter courses by eecs h/ss or ethics requirements
 - filter by more than one requirement at once
-- sort by ratemyprofessor rating avg of each course
-- see ratemyprofessor rating avgs on course cards
+- sort by and see ratemyprofessor rating avg of each course
 - filter by if there are seats reserved for your major/year
 - sort by A/A+ percent or # of ratings
 - search spring 2027 eecs listings
