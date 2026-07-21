@@ -292,14 +292,15 @@ export default function Catalog() {
     // dropdown and direct URLs, but must not become the auto-selected landing
     // term nor trigger the new-term-discovery migration below.
     const nonDraftTerms = terms.filter((t) => !t.isDraft);
-    const latestTerm = (nonDraftTerms.length ? nonDraftTerms : terms).toSorted(
-      (a, b) => {
-        // Sort by year DESC first
-        if (a.year !== b.year) return b.year - a.year;
-        // Then by semester hierarchy DESC
-        return SEMESTER_ORDER[b.semester] - SEMESTER_ORDER[a.semester];
-      }
-    )[0];
+    // Use [...].sort (not toSorted) — older Safari/WebKit lack Array.prototype.toSorted.
+    const latestTerm = [
+      ...(nonDraftTerms.length ? nonDraftTerms : terms),
+    ].sort((a, b) => {
+      // Sort by year DESC first
+      if (a.year !== b.year) return b.year - a.year;
+      // Then by semester hierarchy DESC
+      return SEMESTER_ORDER[b.semester] - SEMESTER_ORDER[a.semester];
+    })[0];
 
     // Invalidate cached term if a newer semester has become available since
     // the user last picked one — this ensures new-term discovery.
