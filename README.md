@@ -6,6 +6,7 @@
 - filter by more than one requirement at once
 - sort by ratemyprofessor rating avg of each course
 - see ratemyprofessor rating avgs on course cards
+- filter by if there are seats reserved for your major/year
 - sort by A/A+ percent or # of ratings
 - search spring 2027 eecs listings
 
@@ -14,6 +15,7 @@
 - see university, l&s, and eecs requirements met
 - see ratemyprofesor ratings for each prof next to their name and a link to their rmp profile
 - see ASSIST transfer equivalents at community colleges
+- see how many seats are reserved for your major/year
 - see final exam time and date
 - get live enrollment info with refresh button
 
