@@ -300,7 +300,7 @@ export default function Filters() {
             <span>Close Filters</span>
           </Button>
         )}
-        {mode === "full" && (
+        {mode !== "compact" && (
           <div className={styles.formControl}>
             <p className={styles.label}>Semester</p>
             <Select

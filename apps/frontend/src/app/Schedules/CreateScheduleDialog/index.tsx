@@ -79,7 +79,7 @@ export default function CreateScheduleDialog({
 
           return {
             value,
-            label: value,
+            label: term.isDraft ? `${value} (Only for EECS)` : value,
           };
         }),
     [terms]
