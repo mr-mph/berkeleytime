@@ -56,6 +56,9 @@ export interface ITermItem {
   selfServiceEnrollEndDate?: string;
   sessions?: ISessionItem[];
   hasCatalogData: boolean;
+  // True for manually-seeded draft/tentative terms (e.g. department schedules
+  // published before SIS opens). Drives the "subject to change" UI treatment.
+  isDraft?: boolean;
 }
 
 const termSchema = new Schema<ITermItem>({
@@ -121,6 +124,7 @@ const termSchema = new Schema<ITermItem>({
     ],
   },
   hasCatalogData: { type: Boolean, required: true, default: true },
+  isDraft: { type: Boolean, default: false },
 });
 
 // for catalog, grade distribution by semester, scheduler, and terms controllers

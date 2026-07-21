@@ -18,5 +18,6 @@ export const formatTerm = (term: ITermItem) => {
     semester,
     startDate: term.beginDate,
     sessions: term.sessions?.map(formatSession),
+    isDraft: term.isDraft ?? false,
   } as TermModule.Term;
 };

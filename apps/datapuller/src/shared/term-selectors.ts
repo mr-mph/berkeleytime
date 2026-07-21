@@ -17,6 +17,11 @@ export const getRecentPastTerms = async () => {
 export const getActiveTerms = async () => {
   return TermModel.find({
     temporalPosition: { $in: ["Current", "Future"] },
+    // Skip manually-seeded draft terms (e.g. a department schedule imported
+    // before SIS opens). SIS has no data for them yet, so pulling would delete
+    // the seeded draft classes/sections. When SIS opens, clear the term's
+    // isDraft flag to hand the term back to the datapuller.
+    isDraft: { $ne: true },
   }).lean();
 };
 

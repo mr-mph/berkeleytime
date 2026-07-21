@@ -61,6 +61,8 @@ export interface ISectionItem {
       formalDescription: string;
     };
   }[];
+  // True for manually-seeded draft sections (see Class.isDraft).
+  isDraft?: boolean;
 }
 
 export interface ISectionItemDocument extends ISectionItem, Document {}
@@ -139,6 +141,7 @@ const sectionSchema = new Schema<ISectionItem>({
       },
     },
   ],
+  isDraft: { type: Boolean },
 });
 
 // for scheduler controller

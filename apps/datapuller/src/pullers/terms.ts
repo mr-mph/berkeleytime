@@ -22,6 +22,15 @@ const updateTerms = async (config: Config, allTerms: boolean) => {
   }
   const termIds = terms.map((term) => term.id);
 
+  // Preserve manually-seeded draft flags across the SIS replace. SIS term docs
+  // don't carry isDraft/hasCatalogData for our seeded draft terms, so without
+  // this a terms pull would strip the "tentative" treatment (and un-protect the
+  // draft classes, since getActiveTerms keys off isDraft).
+  const draftTermIds = await TermModel.find({
+    id: { $in: termIds },
+    isDraft: true,
+  }).distinct("id");
+
   log.trace("Deleting terms to be replaced...");
 
   const { deletedCount } = await TermModel.deleteMany({
@@ -45,6 +54,16 @@ const updateTerms = async (config: Config, allTerms: boolean) => {
           upsert: true,
         },
       }))
+    );
+  }
+
+  if (draftTermIds.length > 0) {
+    await TermModel.updateMany(
+      { id: { $in: draftTermIds } },
+      { $set: { isDraft: true, hasCatalogData: true } }
+    );
+    log.info(
+      `Restored draft flags on ${draftTermIds.length.toLocaleString()} term(s).`
     );
   }
 
