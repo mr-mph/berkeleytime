@@ -300,47 +300,45 @@ export default function Filters() {
             <span>Close Filters</span>
           </Button>
         )}
-        {mode !== "compact" && (
-          <div className={styles.formControl}>
-            <p className={styles.label}>Semester</p>
-            <Select
-              searchable
-              disabled={!terms || terms.length === 0}
-              value={currentTermLabel}
-              onChange={(value) => {
-                const selectedTerm = availableTerms.find(
-                  (term) => `${term.semester} ${term.year}` === value
+        <div className={styles.formControl}>
+          <p className={styles.label}>Semester</p>
+          <Select
+            searchable
+            disabled={!terms || terms.length === 0}
+            value={currentTermLabel}
+            onChange={(value) => {
+              const selectedTerm = availableTerms.find(
+                (term) => `${term.semester} ${term.year}` === value
+              );
+              if (selectedTerm) {
+                navigate(
+                  `/catalog/${selectedTerm.year}/${selectedTerm.semester}`
                 );
-                if (selectedTerm) {
-                  navigate(
-                    `/catalog/${selectedTerm.year}/${selectedTerm.semester}`
-                  );
-                }
+              }
+            }}
+            options={availableTerms.map((term) => ({
+              value: `${term.semester} ${term.year}`,
+              label: term.isDraft
+                ? `${term.semester} ${term.year} (Only for EECS)`
+                : `${term.semester} ${term.year}`,
+            }))}
+            searchPlaceholder="Search semesters..."
+            emptyMessage="No semesters found."
+            maxListHeight={130}
+          />
+          {currentTermIsDraft && (
+            <p
+              style={{
+                marginTop: 4,
+                fontSize: "0.75rem",
+                lineHeight: 1.3,
+                color: "var(--amber-600, #b45309)",
               }}
-              options={availableTerms.map((term) => ({
-                value: `${term.semester} ${term.year}`,
-                label: term.isDraft
-                  ? `${term.semester} ${term.year} (Only for EECS)`
-                  : `${term.semester} ${term.year}`,
-              }))}
-              searchPlaceholder="Search semesters..."
-              emptyMessage="No semesters found."
-              maxListHeight={130}
-            />
-            {currentTermIsDraft && (
-              <p
-                style={{
-                  marginTop: 4,
-                  fontSize: "0.75rem",
-                  lineHeight: 1.3,
-                  color: "var(--amber-600, #b45309)",
-                }}
-              >
-                Tentative schedule — subject to change.
-              </p>
-            )}
-          </div>
-        )}
+            >
+              Tentative schedule — subject to change.
+            </p>
+          )}
+        </div>
         <div className={styles.formControl}>
           <p className={styles.label}>Sort By</p>
           <div className={styles.sortControls}>
