@@ -26,7 +26,7 @@ const BACKUP_LOOKBACK_DAYS = 3;
 
 /**
  * Never touch local user / private state, even if a future public dump includes them.
- * mongorestore without --drop keeps existing docs on _id conflict (backup is older).
+ * Restore uses --mode=upsert (replace matching _ids; insert missing).
  *
  * Also never overwrite locally-owned enrichment datasets that we pull ourselves:
  * - rmp_professors: Rate My Professors cache
@@ -310,9 +310,11 @@ const downloadBackup = async (
 
 /**
  * Merge the public dump into local Mongo.
- * - No --drop / no --upsert: existing local docs (newer) are kept on _id conflict.
- * - Missing docs from the backup are inserted.
- * - User/private collections are excluded.
+ * - --mode=upsert: insert new docs; replace matching _ids from the backup
+ *   (avoids E11000 spam from insert-only merges against an already-seeded DB).
+ * - No --drop: local-only docs not in the dump are left alone.
+ * - User/private collections are excluded; local-owned collections are also
+ *   snapshotted and restored around this call.
  */
 const mergePublicBackup = async (
   archivePath: string,
@@ -323,24 +325,17 @@ const mergePublicBackup = async (
     `--uri=${mongoUri}`,
     "--gzip",
     `--archive=${archivePath}`,
+    "--mode=upsert",
     "--nsInclude=bt.*",
     ...NS_EXCLUDE.flatMap((ns) => ["--nsExclude", ns]),
   ];
   log.info(
-    "Merging public backup into local DB (keep existing docs; insert missing only)"
+    "Merging public backup into local DB (upsert by _id; skip excluded namespaces)"
   );
   const result = await runCommand("mongorestore", args, log);
-  // Duplicate-key skips on existing _ids are expected and may yield a non-zero
-  // exit depending on mongorestore version; treat "documents restored" as success.
   if (result.code !== 0) {
-    const restored = /document\(s\) restored successfully/.test(result.stderr);
-    if (!restored) {
-      throw new Error(
-        `mongorestore exited with code ${result.code}: ${result.stderr.trim()}`
-      );
-    }
-    log.warn(
-      `mongorestore exited ${result.code} but restored documents (likely duplicate-key skips on newer local data)`
+    throw new Error(
+      `mongorestore exited with code ${result.code}: ${result.stderr.trim()}`
     );
   }
 };
@@ -426,7 +421,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: etag,
           lastRestoredAt: new Date(),
-          message: `Merged public backup ${dateKey}; preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
+          message: `Upserted public backup ${dateKey}; preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
         },
       },
       { upsert: true }

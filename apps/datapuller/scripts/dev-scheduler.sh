@@ -41,8 +41,8 @@ echo "Datapuller dev scheduler started."
 
 # Enrollment: merge berkeleytime.com public daily backup when available.
 # Publish time is unreliable, so probe recent PT dates each hour and no-op if
-# already merged for that file. Merges without --drop so newer local docs win.
-# Crosslisting fan-out also runs after each successful merge.
+# already merged for that file. Upserts by _id so enrollment numbers refresh
+# without duplicate-key spam. Crosslisting fan-out also runs after each merge.
 (
   sleep 20
   while true; do
