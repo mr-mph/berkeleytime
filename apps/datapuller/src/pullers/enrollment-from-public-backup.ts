@@ -33,6 +33,10 @@ const BACKUP_LOOKBACK_DAYS = 3;
  * Also never overwrite locally-owned enrichment datasets that we pull ourselves:
  * - rmp_professors: Rate My Professors cache
  * - articulations: ASSIST.org CCC→Berkeley articulations
+ *
+ * Spring 2027 draft schedule is NOT excluded here (it lives in shared
+ * classes/sections/terms/catalog_classes). Instead we re-seed it from
+ * scripts/data/spring-2027-draft.json after every successful merge.
  */
 const NS_EXCLUDE = [
   "bt.users",
@@ -64,6 +68,10 @@ const LOCAL_OWNED_COLLECTIONS = [
   "rmp_professors",
   "articulations",
 ] as const;
+
+/** Idempotent draft importer mounted into the datapuller container. */
+const DRAFT_SCHEDULE_IMPORT_SCRIPT =
+  "/datapuller/scripts/import-draft-schedule.ts";
 
 const SYNC_STATUS_KEY = "public-backup-sync";
 const SYNC_LOCK_PATH = "/tmp/enrollment-from-public-backup.lock";
@@ -255,6 +263,77 @@ const restoreLocalOwnedSnapshots = async (
   }
 };
 
+/**
+ * Re-seed the Spring 2027 draft schedule after a public backup merge.
+ * Draft rows live in shared catalog collections that --drop replaces, so
+ * exclude/snapshot can't preserve them — re-import from JSON instead.
+ * Soft-fails (warn) so a missing term / importer hiccup doesn't block
+ * enrollment restore.
+ */
+const reseedDraftSchedule = async (
+  mongoUri: string,
+  log: Config["log"]
+): Promise<boolean> => {
+  try {
+    await access(DRAFT_SCHEDULE_IMPORT_SCRIPT);
+  } catch {
+    log.warn(
+      `Draft schedule importer not found at ${DRAFT_SCHEDULE_IMPORT_SCRIPT}; skipping reseed`
+    );
+    return false;
+  }
+
+  log.info("Re-seeding Spring 2027 draft schedule after public backup merge");
+  try {
+    const result = await new Promise<{ code: number; stderr: string }>(
+      (resolve, reject) => {
+        const child = spawn(
+          "npx",
+          ["tsx", DRAFT_SCHEDULE_IMPORT_SCRIPT],
+          {
+            env: { ...process.env, MONGODB_URI: mongoUri },
+            stdio: ["ignore", "pipe", "pipe"],
+          }
+        );
+        let stderr = "";
+        child.stderr.on("data", (chunk: Buffer) => {
+          const text = chunk.toString();
+          stderr += text;
+          for (const line of text.split("\n")) {
+            const trimmed = line.trim();
+            if (trimmed) log.info(trimmed);
+          }
+        });
+        child.stdout.on("data", (chunk: Buffer) => {
+          const line = chunk.toString().trim();
+          if (line) log.info(line);
+        });
+        child.on("error", reject);
+        child.on("close", (code) => {
+          resolve({ code: code ?? 1, stderr });
+        });
+      }
+    );
+
+    if (result.code !== 0) {
+      log.warn(
+        `Draft schedule reseed failed (backup merge still kept): ${result.stderr.trim() || `exit ${result.code}`}`
+      );
+      return false;
+    }
+  } catch (error) {
+    log.warn(
+      `Draft schedule reseed failed (backup merge still kept): ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+    return false;
+  }
+
+  log.info("Spring 2027 draft schedule reseeded");
+  return true;
+};
+
 const invalidateBackendCaches = async (
   backendUrl: string,
   log: Config["log"]
@@ -437,6 +516,12 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
       log
     );
 
+    // Draft Sp2027 lives in shared classes/sections/terms — re-seed from JSON.
+    const draftReseeded = await reseedDraftSchedule(
+      config.mongoDB.uri,
+      log
+    );
+
     // Recompute denormalized RMP on catalog_classes from our local professor cache
     // (backup catalog rows often lack / stale rmp* fields).
     log.info("Re-applying RMP averages onto catalog_classes from local cache");
@@ -453,7 +538,7 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: etag,
           lastRestoredAt: new Date(),
-          message: `Restored public backup ${dateKey} (--drop); preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
+          message: `Restored public backup ${dateKey} (--drop); preserved users + rmp_professors + articulations; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog enrollment + RMP`,
         },
       },
       { upsert: true }

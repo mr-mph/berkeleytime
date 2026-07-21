@@ -29,8 +29,9 @@
  * Run from repo root:   npx tsx scripts/import-draft-schedule.ts
  * Or in the datapuller container:
  *   npx tsx /datapuller/scripts/import-draft-schedule.ts
- * Local docker compose runs this automatically from the datapuller
- * dev-scheduler after the first terms + courses pull.
+ * Local docker compose re-seeds this automatically after each
+ * enrollment-from-public-backup merge (draft rows live in shared
+ * classes/sections/terms that the backup --drop replaces).
  */
 import fs from "fs";
 import mongoose from "mongoose";

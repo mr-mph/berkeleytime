@@ -42,7 +42,9 @@ echo "Datapuller dev scheduler started."
 # Enrollment: merge berkeleytime.com public daily backup when available.
 # Publish time is unreliable, so probe recent PT dates each hour and no-op if
 # already merged for that file. Uses mongorestore --drop for a clean refresh
-# (this mongorestore has no --upsert). Crosslisting fan-out runs after each merge.
+# (this mongorestore has no --upsert). Preserves users / rmp_professors /
+# articulations, then re-seeds the Spring 2027 draft schedule. Crosslisting
+# fan-out runs after each merge.
 (
   sleep 20
   while true; do
@@ -56,19 +58,13 @@ echo "Datapuller dev scheduler started."
 # Active catalog data via SIS (disabled — hits gateway.api.berkeley.edu/sis).
 # Roughly ~1k–3k HTTP requests per cycle: courses ~200–400; sections/classes
 # ~hundreds per UGRD current/future term (paginated 50 pages × 50 items at a time).
-# After terms + courses, seed the draft Spring 2027 schedule (idempotent) so
-# local/dev has tentative offerings before SIS opens for that term.
+# Spring 2027 draft schedule is re-seeded by enrollment-from-public-backup after
+# each merge (not here) so backup --drop does not wipe local draft offerings.
 # (
 #   sleep 30
 #   while true; do
 #     run_puller terms-nearby
 #     run_puller courses
-#     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Importing draft Spring 2027 schedule..."
-#     if npx tsx /datapuller/scripts/import-draft-schedule.ts; then
-#       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import finished"
-#     else
-#       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import failed (will retry next cycle)"
-#     fi
 #     run_puller sections-active
 #     run_puller classes-active
 #     sleep 43200

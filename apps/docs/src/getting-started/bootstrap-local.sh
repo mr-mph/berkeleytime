@@ -192,14 +192,21 @@ seed_database() {
   local datapuller_container_id
   datapuller_container_id="$($compose_cmd ps -q datapuller)"
   if [[ -n "$datapuller_container_id" ]]; then
+    log "Re-seeding Spring 2027 draft schedule (wiped by mongorestore --drop)..."
+    if docker exec "$datapuller_container_id" sh -c \
+      'npx tsx /datapuller/scripts/import-draft-schedule.ts'; then
+      log "Spring 2027 draft schedule reseeded."
+    else
+      warn "Draft schedule import failed (term may be missing from backup); continuing."
+    fi
     log "Syncing catalog enrollment (reserved seats, open counts) from restored backup..."
     docker exec "$datapuller_container_id" sh -c \
       'cd /datapuller && turbo run main --filter=datapuller --env-mode=loose -- --puller=catalog-sync-enrollment'
   else
-    warn "Datapuller container not running; skipped catalog enrollment sync."
+    warn "Datapuller container not running; skipped draft reseed + catalog enrollment sync."
   fi
 
-  log "MongoDB restore complete (users collection preserved / re-seeded)."
+  log "MongoDB restore complete (users preserved; Spring 2027 draft reseeded when possible)."
 }
 
 parse_args() {

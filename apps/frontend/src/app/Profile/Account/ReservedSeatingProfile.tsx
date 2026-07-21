@@ -122,13 +122,17 @@ export default function ReservedSeatingProfile() {
     });
     const suggested = result.data?.suggestedReservedSeatGroups ?? [];
     setSelectedGroups((prev) => {
-      const next = new Set(prev);
-      for (const group of suggested) next.add(group);
-      return [...next];
+      if (suggested.length === 0) return prev;
+      // Suggested list is already score-sorted (most similar first). Keep that
+      // order at the front; append any prior manual picks that weren't suggested.
+      return [
+        ...suggested,
+        ...prev.filter((group) => !suggested.includes(group)),
+      ];
     });
     setStatusMessage(
       suggested.length > 0
-        ? `Added ${suggested.length} suggested group${suggested.length === 1 ? "" : "s"}. Review and save.`
+        ? `Added ${suggested.length} suggested group${suggested.length === 1 ? "" : "s"} (most similar first). Review and save.`
         : "No matching groups found — search the list below or adjust your profile."
     );
   };
@@ -181,8 +185,9 @@ export default function ReservedSeatingProfile() {
             onChange={(event) => setTermsInAttendance(event.target.value)}
           />
           <p className={styles.hint}>
-            0–2 terms (and undergraduate) matches new first-year reserved seats;
-            use the transfer checkbox instead if you are a new transfer.
+            0–2 terms matches &quot;New First Year Undergraduate&quot; pools (not
+            specialty programs like Freshman Edge). Use the transfer checkbox
+            instead if you are a new transfer.
           </p>
         </div>
 
@@ -275,7 +280,8 @@ export default function ReservedSeatingProfile() {
         {suggestedGroups.length > 0 && (
           <p className={styles.hint}>
             {suggestedGroups.length} suggested group
-            {suggestedGroups.length === 1 ? "" : "s"} listed first.
+            {suggestedGroups.length === 1 ? "" : "s"} listed first (most
+            similar at the top).
           </p>
         )}
       </div>

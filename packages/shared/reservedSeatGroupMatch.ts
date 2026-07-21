@@ -189,10 +189,15 @@ const levelMatch = (
 const isTransferGroup = (description: string): boolean =>
   /\btransfers?\b/i.test(description);
 
+/**
+ * Canonical SIS "new first-year admit" pools only.
+ * Do NOT match bare "freshman"/"freshmen" — that pulls in specialty programs
+ * like Freshman Edge that are not automatic for every first-year student.
+ */
 const isNewStudentGroup = (description: string): boolean =>
-  /\bnew (?:first year )?undergraduate\b|\bnew freshman\b|\bfreshmen\b/i.test(
+  /\bnew first[ -]?year undergraduate\b|\bnew freshman(?:\s+students?)?\b/i.test(
     description
-  );
+  ) && !/\bedge\b/i.test(description);
 
 /** Standalone new-first-year pools (no college/major constraint in the label). */
 const isPureNewStudentGroup = (description: string): boolean =>
@@ -200,6 +205,22 @@ const isPureNewStudentGroup = (description: string): boolean =>
   !/\bcollege\b|\bschool of\b|\bmajors?\b|\bminors?\b|\bundeclared\b/i.test(
     description
   );
+
+/**
+ * Broad undergrad-only pools ("All Undergraduate Students", etc.) with no
+ * major/college/terms/program constraint in the label.
+ */
+const isGenericUndergraduateGroup = (description: string): boolean => {
+  const text = description.trim();
+  const looksUndergradWide =
+    /^(?:all\s+)?undergraduates?(?:\s+students?)?$/i.test(text) ||
+    /^all\s+undergraduate\s+students?\b/i.test(text) ||
+    /^undergraduate\s+students?\b/i.test(text);
+  if (!looksUndergradWide) return false;
+  return !/\bmajors?\b|\bminors?\b|\bcollege\b|\bschool of\b|\bterms?\s+in\s+attendance\b|\btransfers?\b|\bedge\b|\bfreshman\b|\bfreshmen\b|\bnew first|\bdeclared\b|\bundeclared\b/i.test(
+    text
+  );
+};
 
 /**
  * Word-boundary alias hit on normalized text. Skips matches preceded by "non"
@@ -321,7 +342,8 @@ export type ReservedSeatGroupScore = {
 /**
  * Rank reserved-seat requirement-group descriptions against an academic profile.
  * Opaque permission-only groups are never suggested.
- * Level alone is never enough — need major/college/terms/transfer specificity.
+ * Level alone is never enough — need major/college/terms/transfer/generic-undergrad
+ * specificity (except canonical new-first-year pools).
  */
 export const scoreReservedSeatGroups = (
   descriptions: string[],
@@ -402,7 +424,22 @@ export const scoreReservedSeatGroups = (
     const genericTerms = isGenericTermsGroup(description) && termsOk === true;
     if (genericTerms) score += 25;
 
-    // Must have a specific hook — not undergrad-only noise.
+    // Broad "All Undergraduate Students" pools for undergrads.
+    const genericUndergrad =
+      isGenericUndergraduateGroup(description) &&
+      profile.studentLevel === "UNDERGRAD";
+    if (genericUndergrad) {
+      // Below major/college hits so more specific matches rank first.
+      score += 20;
+    } else if (
+      isGenericUndergraduateGroup(description) &&
+      profile.studentLevel != null &&
+      profile.studentLevel !== "UNDERGRAD"
+    ) {
+      hardFail = true;
+    }
+
+    // Must have a specific hook — not undergrad-only noise from levelMatch.
     // Pure new-first-year labels match on terms; college/major-scoped ones
     // still need those hits (via collegeCounts / majorHits above).
     const newFirstYearSignal =
@@ -412,6 +449,7 @@ export const scoreReservedSeatGroups = (
       minorHits > 0 ||
       collegeCounts ||
       genericTerms ||
+      genericUndergrad ||
       newFirstYearSignal ||
       (transfer && isNewTransfer && (majorHits > 0 || collegeCounts));
 
