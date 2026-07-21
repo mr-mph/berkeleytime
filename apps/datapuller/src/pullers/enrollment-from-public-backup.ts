@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { access, unlink } from "node:fs/promises";
+import { access, open, stat, unlink } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -66,6 +66,11 @@ const LOCAL_OWNED_COLLECTIONS = [
 ] as const;
 
 const SYNC_STATUS_KEY = "public-backup-sync";
+const SYNC_LOCK_PATH = "/tmp/enrollment-from-public-backup.lock";
+
+/** mongorestore treats /db in the URI as --db; strip it when using --archive. */
+const mongoToolsUri = (uri: string): string =>
+  uri.replace(/^(mongodb(?:\+srv)?:\/\/[^/]+)\/[^?]*/, "$1/");
 
 interface IPublicBackupSyncStatus {
   key: string;
@@ -308,6 +313,13 @@ const downloadBackup = async (
     response.body as import("node:stream/web").ReadableStream
   );
   await pipeline(body, createWriteStream(destination));
+  const info = await stat(destination);
+  if (info.size <= 0) {
+    throw new Error(`Downloaded backup is empty: ${destination}`);
+  }
+  log.info(
+    `Downloaded ${(info.size / (1024 * 1024)).toFixed(1)} MiB → ${destination}`
+  );
 };
 
 /**
@@ -322,7 +334,7 @@ const mergePublicBackup = async (
   log: Config["log"]
 ) => {
   const args = [
-    `--uri=${mongoUri}`,
+    `--uri=${mongoToolsUri(mongoUri)}`,
     "--gzip",
     `--archive=${archivePath}`,
     "--drop",
@@ -346,6 +358,25 @@ const mergePublicBackup = async (
  * so we HEAD recent PT dates and take the newest file that exists.
  */
 export const syncEnrollmentFromPublicBackup = async (config: Config) => {
+  const { log } = config;
+
+  let lockHandle: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    lockHandle = await open(SYNC_LOCK_PATH, "wx");
+  } catch {
+    log.info("Another public-backup sync is already running; skipping");
+    return;
+  }
+
+  try {
+    await syncEnrollmentFromPublicBackupLocked(config);
+  } finally {
+    await lockHandle.close().catch(() => undefined);
+    await unlink(SYNC_LOCK_PATH).catch(() => undefined);
+  }
+};
+
+const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
   const { log } = config;
 
   log.info(
@@ -385,8 +416,9 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
 
   await ensureMongorestore(log);
 
-  const archivePath = path.join("/tmp", `prod_public_backup-${dateKey}.gz`);
-  const snapshotDir = path.join("/tmp", `bt-local-owned-${dateKey}`);
+  const runId = `${dateKey}-${process.pid}-${Date.now()}`;
+  const archivePath = path.join("/tmp", `prod_public_backup-${runId}.gz`);
+  const snapshotDir = path.join("/tmp", `bt-local-owned-${runId}`);
   try {
     await runCommand("mkdir", ["-p", snapshotDir], log);
     const localSnapshots = await snapshotLocalOwnedCollections(
