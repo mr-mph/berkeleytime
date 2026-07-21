@@ -33,7 +33,13 @@ export type ParsedUcbCatalogEnrollment = {
 
 /** True when the catalog page has no usable seat counts (common on non-controlling cross-listings). */
 export function isBlankUcbEnrollment(
-  scraped: Pick<ParsedUcbEnrollment, "enrolledCount" | "maxEnroll"> | null | undefined
+  scraped:
+    | {
+        enrolledCount?: number | null;
+        maxEnroll?: number | null;
+      }
+    | null
+    | undefined
 ): boolean {
   if (!scraped) return true;
   return (scraped.maxEnroll ?? 0) <= 0 && (scraped.enrolledCount ?? 0) <= 0;

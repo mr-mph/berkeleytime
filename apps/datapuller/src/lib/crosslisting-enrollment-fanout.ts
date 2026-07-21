@@ -6,13 +6,9 @@ import {
 } from "@repo/common/models";
 import { isBlankUcbEnrollment } from "@repo/shared";
 
+import type { Config } from "../shared/config";
 import { updateCatalogEnrollment } from "./catalog-denormalize";
 import { computeActiveReservedMaxCount } from "./enrollment-utils";
-
-type Logger = {
-  info: (...args: unknown[]) => void;
-  warn: (...args: unknown[]) => void;
-};
 
 type LatestEnrollment = {
   doc: IEnrollmentHistoryItem;
@@ -234,7 +230,7 @@ const applyDonorToSection = async (
  * missing) data. Works from DB state — independent of scrape / backup / SIS.
  */
 export const fanOutCrosslistingEnrollmentForTerm = async (
-  log: Logger,
+  log: Config["log"],
   year: number,
   semester: string
 ): Promise<{ groups: number; updatedSections: number }> => {
