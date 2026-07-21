@@ -27,7 +27,10 @@
  *   mongosh> db.terms.updateMany({ name: "2027 Spring" }, { $set: { isDraft: false } })
  *
  * Run from repo root:   npx tsx scripts/import-draft-schedule.ts
- * Or in the backend container: npx tsx /backend/scripts/import-draft-schedule.ts
+ * Or in the datapuller container:
+ *   npx tsx /datapuller/scripts/import-draft-schedule.ts
+ * Local docker compose runs this automatically from the datapuller
+ * dev-scheduler after the first terms + courses pull.
  */
 import fs from "fs";
 import mongoose from "mongoose";

@@ -51,12 +51,20 @@ echo "Datapuller dev scheduler started."
   done
 ) &
 
-# Active catalog data: twice daily (staggered start)
+# Active catalog data: twice daily (staggered start).
+# After terms + courses, seed the draft Spring 2027 schedule (idempotent) so
+# local/dev has tentative offerings before SIS opens for that term.
 (
   sleep 30
   while true; do
     run_puller terms-nearby
     run_puller courses
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Importing draft Spring 2027 schedule..."
+    if npx tsx /datapuller/scripts/import-draft-schedule.ts; then
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import finished"
+    else
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Draft schedule import failed (will retry next cycle)"
+    fi
     run_puller sections-active
     run_puller classes-active
     sleep 43200
