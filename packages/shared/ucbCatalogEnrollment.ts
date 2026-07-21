@@ -125,13 +125,194 @@ function extractDrupalSettingsJson(html: string): unknown {
   }
 }
 
+type RawSeatReservation = NonNullable<
+  UcbEnrollmentStatus["seatReservations"]
+>[number];
+
+const reservationFromDateMs = (reservation: RawSeatReservation): number => {
+  const raw = reservation.fromDate ?? "";
+  const parsed = raw ? new Date(raw).getTime() : Number.NaN;
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+/**
+ * Berkeley exposes current reservations under `available` and time-windowed
+ * reservations under `history`. After a pool is released, it disappears from
+ * `available` but remains in `history` (often with a maxEnroll<=1 stub on the
+ * newest window). Prefer `available` when present; otherwise keep the latest
+ * real (maxEnroll > 1) history window so we don't wipe reserved-seat rows.
+ * Released pools are preserved as full (enrolledCount = maxEnroll).
+ */
+export function resolveSeatReservationsFromPayloads(
+  availableReservations: RawSeatReservation[] | undefined,
+  historyReservations: RawSeatReservation[] | undefined
+): {
+  seatReservationCount: ParsedUcbEnrollment["seatReservationCount"];
+  seatReservationTypes: ParsedUcbEnrollment["seatReservationTypes"];
+} {
+  const available = availableReservations ?? [];
+  const history = historyReservations ?? [];
+  const availableNumbers = new Set(
+    available
+      .map((reservation) => reservation.number)
+      .filter((number): number is number => number != null)
+  );
+
+  const historyByNumber = new Map<number, RawSeatReservation[]>();
+  for (const reservation of history) {
+    if (reservation.number == null) continue;
+    const list = historyByNumber.get(reservation.number) ?? [];
+    list.push(reservation);
+    historyByNumber.set(reservation.number, list);
+  }
+
+  const selected = new Map<number, RawSeatReservation>();
+
+  for (const reservation of available) {
+    if (reservation.number == null) continue;
+    selected.set(reservation.number, reservation);
+  }
+
+  for (const [number, windows] of historyByNumber) {
+    if (availableNumbers.has(number)) continue;
+    const sorted = [...windows].sort(
+      (a, b) => reservationFromDateMs(a) - reservationFromDateMs(b)
+    );
+    const latest = sorted[sorted.length - 1];
+    const latestActive = [...sorted]
+      .reverse()
+      .find((reservation) => (reservation.maxEnroll ?? 0) > 1);
+
+    if (!latestActive) continue;
+
+    // Newest window is a release stub — keep the group, mark it full.
+    if ((latest?.maxEnroll ?? 0) <= 1) {
+      selected.set(number, {
+        ...latestActive,
+        enrolledCount: latestActive.maxEnroll ?? 0,
+      });
+      continue;
+    }
+
+    selected.set(number, latestActive);
+  }
+
+  // Labels come from the selected windows so release stubs with future
+  // fromDates don't mark preserved groups as inactive.
+  const typesByNumber = new Map<
+    number,
+    ParsedUcbEnrollment["seatReservationTypes"][number]
+  >();
+  const considerType = (reservation: RawSeatReservation) => {
+    if (
+      reservation.number == null ||
+      !reservation.requirementGroup?.description ||
+      typesByNumber.has(reservation.number)
+    ) {
+      return;
+    }
+    typesByNumber.set(reservation.number, {
+      number: reservation.number,
+      requirementGroup: {
+        code: reservation.requirementGroup.code,
+        description: reservation.requirementGroup.description ?? "Unknown",
+      },
+      fromDate: reservation.fromDate ?? "",
+    });
+  };
+  for (const reservation of selected.values()) considerType(reservation);
+  for (const reservation of available) considerType(reservation);
+  for (const reservation of history) considerType(reservation);
+
+  const seatReservationCount = [...selected.values()].map((reservation) => ({
+    number: reservation.number ?? 0,
+    maxEnroll: reservation.maxEnroll ?? 0,
+    enrolledCount: reservation.enrolledCount,
+  }));
+
+  return {
+    seatReservationCount,
+    seatReservationTypes: [...typesByNumber.values()],
+  };
+}
+
+/** Union seat-reservation labels by number; incoming overwrites same number. */
+export function mergeSeatReservationTypes<
+  T extends ParsedUcbEnrollment["seatReservationTypes"][number],
+>(existing: T[] | undefined, incoming: T[] | undefined): T[] {
+  const byNumber = new Map<number, T>();
+  for (const type of existing ?? []) {
+    if (type.number == null) continue;
+    byNumber.set(type.number, type);
+  }
+  for (const type of incoming ?? []) {
+    if (type.number == null) continue;
+    byNumber.set(type.number, type);
+  }
+  return [...byNumber.values()];
+}
+
+export function seatReservationCountsEqual(
+  a:
+    | Array<{ number?: number; maxEnroll?: number; enrolledCount?: number }>
+    | undefined,
+  b:
+    | Array<{ number?: number; maxEnroll?: number; enrolledCount?: number }>
+    | undefined
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) return false;
+  for (const item of left) {
+    const match = right.find((other) => other.number === item.number);
+    if (!match) return false;
+    if (
+      (item.maxEnroll ?? 0) !== (match.maxEnroll ?? 0) ||
+      (item.enrolledCount ?? 0) !== (match.enrolledCount ?? 0)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * If an update drops a reserved group, keep it with 0 seats left.
+ * Incoming values win for shared numbers.
+ */
+export function preserveRemovedSeatReservationCounts<
+  T extends { number?: number; maxEnroll?: number; enrolledCount?: number },
+>(incoming: T[] | undefined, previous: T[] | undefined): T[] {
+  const byNumber = new Map<number, T>();
+  for (const reservation of previous ?? []) {
+    if (reservation.number == null) continue;
+    if ((reservation.maxEnroll ?? 0) <= 1) continue;
+    byNumber.set(reservation.number, {
+      ...reservation,
+      enrolledCount: reservation.maxEnroll,
+    });
+  }
+  for (const reservation of incoming ?? []) {
+    if (reservation.number == null) continue;
+    byNumber.set(reservation.number, reservation);
+  }
+  return [...byNumber.values()];
+}
+
 function mapEnrollmentStatus(
-  payload: UcbEnrollmentPayload | undefined
+  payload: UcbEnrollmentPayload | undefined,
+  seatReservationsOverride?: {
+    seatReservationCount: ParsedUcbEnrollment["seatReservationCount"];
+    seatReservationTypes: ParsedUcbEnrollment["seatReservationTypes"];
+  }
 ): ParsedUcbEnrollment | null {
   const status = payload?.enrollmentStatus;
   if (!status || payload?.id == null) return null;
 
   const seatReservations = status.seatReservations ?? [];
+  const resolved =
+    seatReservationsOverride ??
+    resolveSeatReservationsFromPayloads(seatReservations, undefined);
 
   return {
     sectionId: String(payload.id),
@@ -145,21 +326,8 @@ function mapEnrollmentStatus(
     openReserved: status.openReserved ?? 0,
     instructorAddConsentRequired: status.instructorAddConsentRequired,
     instructorDropConsentRequired: status.instructorDropConsentRequired,
-    seatReservationCount: seatReservations.map((reservation) => ({
-      number: reservation.number ?? 0,
-      maxEnroll: reservation.maxEnroll ?? 0,
-      enrolledCount: reservation.enrolledCount,
-    })),
-    seatReservationTypes: seatReservations
-      .filter((reservation) => reservation.requirementGroup?.description)
-      .map((reservation) => ({
-        number: reservation.number ?? 0,
-        requirementGroup: {
-          code: reservation.requirementGroup?.code,
-          description: reservation.requirementGroup?.description ?? "Unknown",
-        },
-        fromDate: reservation.fromDate ?? "",
-      })),
+    seatReservationCount: resolved.seatReservationCount,
+    seatReservationTypes: resolved.seatReservationTypes,
   };
 }
 
@@ -173,9 +341,16 @@ export function parseUcbCatalogEnrollment(html: string): ParsedUcbEnrollment {
     };
   };
 
+  const availablePayload = settings.ucb?.enrollment?.available;
+  const historyPayload = settings.ucb?.enrollment?.history;
+  const resolvedSeats = resolveSeatReservationsFromPayloads(
+    availablePayload?.enrollmentStatus?.seatReservations,
+    historyPayload?.enrollmentStatus?.seatReservations
+  );
+
   const parsed =
-    mapEnrollmentStatus(settings.ucb?.enrollment?.available) ??
-    mapEnrollmentStatus(settings.ucb?.enrollment?.history);
+    mapEnrollmentStatus(availablePayload, resolvedSeats) ??
+    mapEnrollmentStatus(historyPayload, resolvedSeats);
 
   if (!parsed) {
     throw new UcbCatalogEnrollmentError(

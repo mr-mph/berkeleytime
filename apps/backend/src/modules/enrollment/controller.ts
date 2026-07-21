@@ -18,6 +18,9 @@ import {
   buildUcbCatalogUrl,
   fetchUcbCatalogEnrollment,
   isBlankUcbEnrollment,
+  mergeSeatReservationTypes,
+  preserveRemovedSeatReservationCounts,
+  seatReservationCountsEqual,
 } from "./ucbCatalogEnrollment";
 
 const MANUAL_REFRESH_GRANULARITY_SECONDS = 60;
@@ -31,6 +34,11 @@ const enrollmentCountsEqual = (
     maxEnroll?: number;
     maxWaitlist?: number;
     openReserved?: number;
+    seatReservationCount?: {
+      number?: number;
+      maxEnroll?: number;
+      enrolledCount?: number;
+    }[];
   },
   b: {
     status?: string;
@@ -40,6 +48,11 @@ const enrollmentCountsEqual = (
     maxEnroll?: number;
     maxWaitlist?: number;
     openReserved?: number;
+    seatReservationCount?: {
+      number?: number;
+      maxEnroll?: number;
+      enrolledCount?: number;
+    }[];
   }
 ) =>
   a.status === b.status &&
@@ -48,7 +61,8 @@ const enrollmentCountsEqual = (
   a.waitlistedCount === b.waitlistedCount &&
   a.maxEnroll === b.maxEnroll &&
   a.maxWaitlist === b.maxWaitlist &&
-  a.openReserved === b.openReserved;
+  a.openReserved === b.openReserved &&
+  seatReservationCountsEqual(a.seatReservationCount, b.seatReservationCount);
 
 const persistScrapedSectionEnrollment = async (
   year: number,
@@ -108,6 +122,11 @@ const persistScrapedSectionEnrollment = async (
     const history = enrollmentDoc.history ?? [];
     const lastEntry = history[history.length - 1];
 
+    historyPoint.seatReservationCount = preserveRemovedSeatReservationCounts(
+      scraped.seatReservationCount,
+      lastEntry?.seatReservationCount
+    );
+
     if (
       lastEntry &&
       enrollmentCountsEqual(lastEntry, historyPoint) &&
@@ -120,7 +139,10 @@ const persistScrapedSectionEnrollment = async (
     }
 
     if (scraped.seatReservationTypes.length > 0) {
-      enrollmentDoc.seatReservationTypes = scraped.seatReservationTypes;
+      enrollmentDoc.seatReservationTypes = mergeSeatReservationTypes(
+        enrollmentDoc.seatReservationTypes,
+        scraped.seatReservationTypes
+      );
     }
 
     await enrollmentDoc.save();

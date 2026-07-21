@@ -6,6 +6,9 @@ import {
   buildUcbCatalogUrl as sharedBuildUcbCatalogUrl,
   fetchUcbCatalogEnrollment as sharedFetchUcbCatalogEnrollment,
   isBlankUcbEnrollment as sharedIsBlankUcbEnrollment,
+  mergeSeatReservationTypes as sharedMergeSeatReservationTypes,
+  seatReservationCountsEqual as sharedSeatReservationCountsEqual,
+  preserveRemovedSeatReservationCounts as sharedPreserveRemovedSeatReservationCounts,
 } from "@repo/shared";
 
 export type {
@@ -15,6 +18,10 @@ export type {
 
 export const buildUcbCatalogUrl = sharedBuildUcbCatalogUrl;
 export const isBlankUcbEnrollment = sharedIsBlankUcbEnrollment;
+export const mergeSeatReservationTypes = sharedMergeSeatReservationTypes;
+export const seatReservationCountsEqual = sharedSeatReservationCountsEqual;
+export const preserveRemovedSeatReservationCounts =
+  sharedPreserveRemovedSeatReservationCounts;
 
 function mapUcbError(error: unknown): never {
   if (error instanceof UcbCatalogEnrollmentError) {

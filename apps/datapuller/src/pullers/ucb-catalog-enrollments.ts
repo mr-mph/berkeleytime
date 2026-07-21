@@ -21,6 +21,9 @@ import { updateCatalogEnrollment } from "../lib/catalog-denormalize";
 import { isSectionEnrollmentBlankInDb } from "../lib/crosslisting-enrollment-fanout";
 import {
   buildActiveSeatReservations,
+  mergeSeatReservationTypes,
+  preserveRemovedSeatReservationCounts,
+  seatReservationCountsEqual,
 } from "../lib/enrollment-utils";
 import { Config } from "../shared/config";
 import { getActiveTerms } from "../shared/term-selectors";
@@ -79,6 +82,11 @@ const enrollmentCountsEqual = (
     maxEnroll?: number;
     maxWaitlist?: number;
     openReserved?: number;
+    seatReservationCount?: {
+      number?: number;
+      maxEnroll?: number;
+      enrolledCount?: number;
+    }[];
   },
   b: {
     status?: string;
@@ -88,6 +96,11 @@ const enrollmentCountsEqual = (
     maxEnroll?: number;
     maxWaitlist?: number;
     openReserved?: number;
+    seatReservationCount?: {
+      number?: number;
+      maxEnroll?: number;
+      enrolledCount?: number;
+    }[];
   }
 ) =>
   a.status === b.status &&
@@ -96,7 +109,8 @@ const enrollmentCountsEqual = (
   a.waitlistedCount === b.waitlistedCount &&
   a.maxEnroll === b.maxEnroll &&
   a.maxWaitlist === b.maxWaitlist &&
-  a.openReserved === b.openReserved;
+  a.openReserved === b.openReserved &&
+  seatReservationCountsEqual(a.seatReservationCount, b.seatReservationCount);
 
 type CatalogEnrollmentPatch = {
   status?: string;
@@ -176,6 +190,12 @@ const persistScrapedSectionEnrollment = async (
         const history = enrollmentDoc.history ?? [];
         const lastEntry = history[history.length - 1];
 
+        historyPoint.seatReservationCount =
+          preserveRemovedSeatReservationCounts(
+            scraped.seatReservationCount,
+            lastEntry?.seatReservationCount
+          );
+
         if (
           lastEntry &&
           enrollmentCountsEqual(lastEntry, historyPoint) &&
@@ -188,7 +208,10 @@ const persistScrapedSectionEnrollment = async (
         }
 
         if (scraped.seatReservationTypes.length > 0) {
-          enrollmentDoc.seatReservationTypes = scraped.seatReservationTypes;
+          enrollmentDoc.seatReservationTypes = mergeSeatReservationTypes(
+            enrollmentDoc.seatReservationTypes,
+            scraped.seatReservationTypes
+          );
         }
 
         await enrollmentDoc.save();

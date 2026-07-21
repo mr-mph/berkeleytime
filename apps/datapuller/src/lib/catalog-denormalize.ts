@@ -33,6 +33,8 @@ import { Config } from "../shared/config";
 import { getCurrentCatalogTerm } from "../shared/term-selectors";
 import {
   buildActiveSeatReservations,
+  buildPreservedSeatReservationCountsFromHistory,
+  preserveRemovedActiveSeatReservations,
 } from "./enrollment-utils";
 
 export type CatalogEnrollmentPatch = {
@@ -837,7 +839,12 @@ export const syncCatalogEnrollmentFromHistories = async (
     .select({
       sectionId: 1,
       seatReservationTypes: 1,
-      history: { $slice: -1 },
+      "history.seatReservationCount": 1,
+      "history.status": 1,
+      "history.enrolledCount": 1,
+      "history.maxEnroll": 1,
+      "history.waitlistedCount": 1,
+      "history.maxWaitlist": 1,
     })
     .lean();
 
@@ -845,12 +852,22 @@ export const syncCatalogEnrollmentFromHistories = async (
   let skippedUnchanged = 0;
 
   for (const hist of histories) {
-    const latest = hist.history?.[0];
+    const history = hist.history ?? [];
+    const latest = history[history.length - 1];
     if (!latest) continue;
-    const seatReservations = buildActiveSeatReservations(
-      latest.seatReservationCount,
-      hist.seatReservationTypes
+
+    const preservedCounts = buildPreservedSeatReservationCountsFromHistory(
+      history
     );
+    const existing = existingByPrimarySectionId.get(hist.sectionId);
+    const seatReservations = preserveRemovedActiveSeatReservations(
+      buildActiveSeatReservations(
+        preservedCounts,
+        hist.seatReservationTypes
+      ),
+      existing?.seatReservations
+    );
+
     const patch: CatalogEnrollmentPatch = {
       status: latest.status,
       enrolledCount: latest.enrolledCount,
@@ -864,7 +881,6 @@ export const syncCatalogEnrollmentFromHistories = async (
       seatReservations,
     };
 
-    const existing = existingByPrimarySectionId.get(hist.sectionId);
     if (existing && catalogEnrollmentPatchMatches(existing, patch)) {
       skippedUnchanged += 1;
       continue;

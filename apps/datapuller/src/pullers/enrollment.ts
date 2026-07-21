@@ -9,6 +9,7 @@ import {
 
 import { syncCatalogEnrollmentFromHistories } from "../lib/catalog-denormalize";
 import { GRANULARITY, getEnrollmentSingulars } from "../lib/enrollment";
+import { mergeSeatReservationTypes } from "../lib/enrollment-utils";
 import { Config } from "../shared/config";
 
 // duration of time in seconds that can pass before being considered a data gap
@@ -296,7 +297,14 @@ const updateEnrollmentHistories = async (config: Config) => {
             bulkOps.push({
               updateOne: {
                 filter: { _id: existingDoc._id },
-                update: { $set: { seatReservationTypes: incomingTypes } },
+                update: {
+                  $set: {
+                    seatReservationTypes: mergeSeatReservationTypes(
+                      existingTypes,
+                      incomingTypes
+                    ),
+                  },
+                },
               },
             });
           }
