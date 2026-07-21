@@ -143,8 +143,19 @@ A seeded database is required for some pages on the frontend. The bootstrap scri
 # Ensure the MongoDB instance is already running.
 docker compose up -d
 
-# Download the public data
-curl -f -o "prod-backup.gz" "https://backups.berkeleytime.com/public/daily/prod_public_backup-$(TZ=America/Los_Angeles date -v -6H +%Y%m%d).gz"
+# Download the newest available public backup (publish time is not reliable)
+for days_ago in 0 1 2; do
+  if date --version >/dev/null 2>&1; then
+    d=$(TZ=America/Los_Angeles date -d "${days_ago} days ago" +%Y%m%d)
+  else
+    d=$(TZ=America/Los_Angeles date -v "-${days_ago}d" +%Y%m%d)
+  fi
+  url="https://backups.berkeleytime.com/public/daily/prod_public_backup-${d}.gz"
+  if curl -fL -o "prod-backup.gz" "$url"; then
+    echo "Downloaded ${d}"
+    break
+  fi
+done
 
 # Copy the data, restore, and seed fake user
 docker cp ./prod-backup.gz berkeleytime-mongodb-1:/tmp/prod-backup.gz

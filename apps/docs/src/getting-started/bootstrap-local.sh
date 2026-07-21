@@ -135,12 +135,44 @@ start_services() {
   $compose_cmd up -d
 }
 
+pt_date_days_ago() {
+  # Print YYYYMMDD for America/Los_Angeles calendar day N days before today.
+  local days_ago="$1"
+  if date --version >/dev/null 2>&1; then
+    # GNU date
+    TZ=America/Los_Angeles date -d "${days_ago} days ago" +%Y%m%d
+  else
+    # BSD date (macOS)
+    TZ=America/Los_Angeles date -v "-${days_ago}d" +%Y%m%d
+  fi
+}
+
+# Public daily backups do not always appear at a fixed hour. Probe recent PT
+# dates (newest first) and download the first that exists.
+download_newest_public_backup() {
+  local out_file="$1"
+  local base="https://backups.berkeleytime.com/public/daily/prod_public_backup"
+  local days_ago date_key url
+
+  for days_ago in 0 1 2; do
+    date_key="$(pt_date_days_ago "$days_ago")"
+    url="${base}-${date_key}.gz"
+    log "Trying public backup ${date_key}..."
+    if curl -fL --retry 2 --retry-delay 2 -o "$out_file" "$url"; then
+      log "Downloaded public backup for ${date_key}"
+      return 0
+    fi
+  done
+
+  die "No public backup available for the last 3 PT days at ${base}-YYYYMMDD.gz"
+}
+
 seed_database() {
   step "Seeding local MongoDB"
   require_cmd curl "Install curl, then re-run."
 
   local backup_file="prod-backup.gz"
-  curl -f -o "$backup_file" "https://backups.berkeleytime.com/public/daily/prod_public_backup-$(TZ=America/Los_Angeles date -v -6H +%Y%m%d).gz"
+  download_newest_public_backup "$backup_file"
 
   local compose_cmd
   compose_cmd="$(detect_compose_cmd)" || die "Docker Compose not found."

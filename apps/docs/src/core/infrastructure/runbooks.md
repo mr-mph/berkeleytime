@@ -42,7 +42,19 @@ Public backups are meant for local development and include only a redacted subse
 - `enrollmenttimeframes`
 
 ```sh
-curl -f -o "prod-backup.gz" "https://backups.berkeleytime.com/public/daily/prod_public_backup-$(TZ=America/Los_Angeles date -v -6H +%Y%m%d).gz"
+# Probe today/yesterday/… in PT — publish time is not reliable.
+for days_ago in 0 1 2; do
+  if date --version >/dev/null 2>&1; then
+    d=$(TZ=America/Los_Angeles date -d "${days_ago} days ago" +%Y%m%d)
+  else
+    d=$(TZ=America/Los_Angeles date -v "-${days_ago}d" +%Y%m%d)
+  fi
+  url="https://backups.berkeleytime.com/public/daily/prod_public_backup-${d}.gz"
+  if curl -fL -o "prod-backup.gz" "$url"; then
+    echo "Downloaded ${d}"
+    break
+  fi
+done
 ```
 
 ### Private backup (Cloudflare Access)
@@ -53,11 +65,20 @@ brew install cloudflare/cloudflare/cloudflared
 cloudflared access login https://backups.berkeleytime.com
 ```
 
-You can then fetch the backup
+You can then fetch the newest available hourly backup (jobs can lag the clock hour):
 ```sh
-cloudflared access curl \
-  "https://backups.berkeleytime.com/private/hourly/prod_backup-$(TZ=America/Los_Angeles date -v -6H +%Y%m%d%H).gz" \
-  -o "prod-backup.gz"
+for hours_ago in 0 1 2 3 4 5; do
+  if date --version >/dev/null 2>&1; then
+    h=$(TZ=America/Los_Angeles date -d "${hours_ago} hours ago" +%Y%m%d%H)
+  else
+    h=$(TZ=America/Los_Angeles date -v "-${hours_ago}H" +%Y%m%d%H)
+  fi
+  url="https://backups.berkeleytime.com/private/hourly/prod_backup-${h}.gz"
+  if cloudflared access curl "$url" -o "prod-backup.gz"; then
+    echo "Downloaded ${h}"
+    break
+  fi
+done
 ```
 
 ### Copy Data Into Container

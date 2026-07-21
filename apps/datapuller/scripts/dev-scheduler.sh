@@ -4,7 +4,9 @@
 #   enrollments (SIS)                    disabled locally (needs SIS API keys)
 #   ucb-catalog-enrollments              disabled (UC Berkeley IT request)
 #   SIS catalog (terms/courses/…)        disabled (avoid gateway.api.berkeley.edu load)
-#   enrollment-from-public-backup        hourly (public daily backup @ 05:00 PT)
+#   enrollment-from-public-backup        hourly (probe for newest public daily backup)
+#   decals                               disabled locally for now
+#   grades-recent / catalog-sync-grades  disabled locally (AWS Athena)
 #   daily extras                         every 24 hours
 
 set -eu
@@ -38,8 +40,8 @@ echo "Datapuller dev scheduler started."
 # ) &
 
 # Enrollment: merge berkeleytime.com public daily backup when available.
-# Public backups publish ~05:00 America/Los_Angeles; poll hourly and no-op if
-# already merged for that date. Merges without --drop so newer local docs win.
+# Publish time is unreliable, so probe recent PT dates each hour and no-op if
+# already merged for that file. Merges without --drop so newer local docs win.
 # Crosslisting fan-out also runs after each successful merge.
 (
   sleep 20
@@ -73,14 +75,15 @@ echo "Datapuller dev scheduler started."
 #   done
 # ) &
 
-# Daily extras (DeCals, recent grades, enrollment windows, RMP, ASSIST)
+# Daily extras (enrollment windows, RMP, ASSIST)
+# DeCals + Athena grades disabled locally for now.
 (
   sleep 90
   while true; do
-    run_puller decals
-    run_puller grades-recent
+    # run_puller decals
+    # run_puller grades-recent
     run_puller enrollment-timeframe
-    run_puller catalog-sync-grades
+    # run_puller catalog-sync-grades
     run_puller ratemyprofessors
     run_puller articulations
     sleep 86400

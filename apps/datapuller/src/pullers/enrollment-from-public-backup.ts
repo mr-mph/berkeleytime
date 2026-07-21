@@ -17,8 +17,12 @@ import { syncCrosslistingEnrollmentFanout } from "./crosslisting-enrollment-fano
 const PUBLIC_BACKUP_BASE =
   "https://backups.berkeleytime.com/public/daily/prod_public_backup";
 
-/** Official public backups are published daily at 05:00 America/Los_Angeles. */
-const BACKUP_HOUR_PT = 5;
+/**
+ * How many PT calendar days back to probe when looking for the newest public
+ * backup. Cron schedules are unreliable (job start ≠ upload ready), so we
+ * HEAD recent dates instead of assuming a publish hour.
+ */
+const BACKUP_LOOKBACK_DAYS = 3;
 
 /**
  * Never touch local user / private state, even if a future public dump includes them.
@@ -85,24 +89,65 @@ const PublicBackupSyncStatusModel = model<IPublicBackupSyncStatus>(
   publicBackupSyncStatusSchema
 );
 
-/** YYYYMMDD in America/Los_Angeles for "now minus 6 hours" (matches docs bootstrap). */
-const backupDateKey = (now = new Date()): string => {
-  // Subtract 6h so pre-5am PT still targets yesterday's published file.
-  const shifted = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+/** YYYYMMDD calendar date in America/Los_Angeles for an absolute instant. */
+const ptDateKey = (instant: Date): string => {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(shifted);
+  }).formatToParts(instant);
   const year = parts.find((p) => p.type === "year")?.value;
   const month = parts.find((p) => p.type === "month")?.value;
   const day = parts.find((p) => p.type === "day")?.value;
   return `${year}${month}${day}`;
 };
 
+/**
+ * PT calendar days ending at "today" (most recent first). Uses noon UTC offsets
+ * so DST transitions don't skip/duplicate a calendar day.
+ */
+const recentPtDateKeys = (
+  lookbackDays = BACKUP_LOOKBACK_DAYS,
+  now = new Date()
+): string[] => {
+  const todayKey = ptDateKey(now);
+  const year = Number(todayKey.slice(0, 4));
+  const month = Number(todayKey.slice(4, 6));
+  const day = Number(todayKey.slice(6, 8));
+  // Anchor at UTC noon on the PT calendar date, then step back whole days.
+  const anchor = Date.UTC(year, month - 1, day, 12, 0, 0);
+  const keys: string[] = [];
+  for (let ago = 0; ago < lookbackDays; ago++) {
+    keys.push(ptDateKey(new Date(anchor - ago * 24 * 60 * 60 * 1000)));
+  }
+  return keys;
+};
+
 const backupUrlForDate = (dateKey: string) =>
   `${PUBLIC_BACKUP_BASE}-${dateKey}.gz`;
+
+type AvailableBackup = {
+  dateKey: string;
+  url: string;
+  etag: string | null;
+};
+
+/** Newest public daily backup that currently exists (HEAD), or null. */
+const findNewestAvailableBackup = async (
+  log: Config["log"]
+): Promise<AvailableBackup | null> => {
+  for (const dateKey of recentPtDateKeys()) {
+    const url = backupUrlForDate(dateKey);
+    const head = await headBackup(url);
+    if (head.ok) {
+      log.info(`Found public backup ${dateKey}`);
+      return { dateKey, url, etag: head.etag };
+    }
+    log.info(`Backup not available yet: ${url}`);
+  }
+  return null;
+};
 
 const runCommand = (
   command: string,
@@ -302,22 +347,23 @@ const mergePublicBackup = async (
 
 /**
  * When classes.berkeley.edu scraping is disabled, merge berkeleytime.com's
- * public daily backup (published ~05:00 America/Los_Angeles) into local Mongo.
+ * public daily backup into local Mongo. Polled hourly — publish time varies,
+ * so we HEAD recent PT dates and take the newest file that exists.
  */
 export const syncEnrollmentFromPublicBackup = async (config: Config) => {
   const { log } = config;
-  const dateKey = backupDateKey();
-  const url = backupUrlForDate(dateKey);
 
   log.info(
-    `Checking for public backup ${dateKey} (daily @ ${BACKUP_HOUR_PT}:00 PT)`
+    `Checking for newest public backup (lookback ${BACKUP_LOOKBACK_DAYS} PT days)`
   );
 
-  const head = await headBackup(url);
-  if (!head.ok) {
-    log.info(`Backup not available yet: ${url}`);
+  const available = await findNewestAvailableBackup(log);
+  if (!available) {
+    log.info("No public backup available in lookback window");
     return;
   }
+
+  const { dateKey, url, etag } = available;
 
   const status =
     (await PublicBackupSyncStatusModel.findOne({
@@ -327,10 +373,18 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
   if (
     status?.lastBackupDate === dateKey &&
     status.lastEtag &&
-    head.etag &&
-    status.lastEtag === head.etag
+    etag &&
+    status.lastEtag === etag
   ) {
     log.info(`Already merged backup ${dateKey} (etag match); skipping`);
+    return;
+  }
+
+  // Prefer a strictly newer calendar date; allow same-date rematch on etag change.
+  if (status?.lastBackupDate && dateKey < status.lastBackupDate) {
+    log.info(
+      `Newest available backup ${dateKey} is older than last merged ${status.lastBackupDate}; skipping`
+    );
     return;
   }
 
@@ -370,7 +424,7 @@ export const syncEnrollmentFromPublicBackup = async (config: Config) => {
       {
         $set: {
           lastBackupDate: dateKey,
-          lastEtag: head.etag,
+          lastEtag: etag,
           lastRestoredAt: new Date(),
           message: `Merged public backup ${dateKey}; preserved users + rmp_professors + articulations; synced catalog enrollment + RMP`,
         },
