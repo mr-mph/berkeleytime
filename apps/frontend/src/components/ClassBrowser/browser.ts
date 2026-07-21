@@ -75,15 +75,15 @@ export enum GradingFilter {
 export enum EnrollmentFilter {
   Open = "Open Seats",
   OpenForYou = "Open Seats (For You)",
-  OpenReserved = "Reserved Open Seats (For You)",
   OpenApartFromReserved = "Non-reserved Open Seats",
   WaitlistOpen = "Open Seats or Open Waitlist",
+  ReservedSeats = "Reserved Seats (For You)",
 }
 
 /** Enrollment filters that need a reserved-seat identity selection. */
 export const enrollmentFiltersRequiringReservedGroups: EnrollmentFilter[] = [
   EnrollmentFilter.OpenForYou,
-  EnrollmentFilter.OpenReserved,
+  EnrollmentFilter.ReservedSeats,
 ];
 
 export const gradingBasisCategoryMap: Record<ClassGradingBasis, GradingFilter> =

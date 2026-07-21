@@ -39,9 +39,10 @@ import {
 } from "../browser";
 
 const LEGACY_ENROLLMENT_FILTER_MAP: Record<string, EnrollmentFilter> = {
-  "Open Reserved Seats": EnrollmentFilter.OpenReserved,
-  "Reserved Seats": EnrollmentFilter.OpenForYou,
-  "Exclusive Reserved Seats": EnrollmentFilter.OpenForYou,
+  "Open Reserved Seats": EnrollmentFilter.ReservedSeats,
+  "Reserved Open Seats (For You)": EnrollmentFilter.ReservedSeats,
+  "Reserved Seats": EnrollmentFilter.ReservedSeats,
+  "Exclusive Reserved Seats": EnrollmentFilter.ReservedSeats,
 };
 
 type CatalogSortBy = GetCatalogSearchQueryVariables["sortBy"];
@@ -98,12 +99,12 @@ export const mapEnrollmentFilter = (
       return "OPEN" as CatalogEnrollmentFilter;
     case EnrollmentFilter.OpenForYou:
       return "OPEN_FOR_YOU" as CatalogEnrollmentFilter;
-    case EnrollmentFilter.OpenReserved:
-      return "OPEN_RESERVED" as CatalogEnrollmentFilter;
     case EnrollmentFilter.OpenApartFromReserved:
       return "NON_RESERVED_OPEN" as CatalogEnrollmentFilter;
     case EnrollmentFilter.WaitlistOpen:
       return "WAITLIST_OPEN" as CatalogEnrollmentFilter;
+    case EnrollmentFilter.ReservedSeats:
+      return "RESERVED_SEATS" as CatalogEnrollmentFilter;
     default:
       return undefined;
   }

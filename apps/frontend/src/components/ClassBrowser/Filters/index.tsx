@@ -485,7 +485,7 @@ export default function Filters() {
               label: filter,
               disabled:
                 (filter === EnrollmentFilter.OpenForYou ||
-                  filter === EnrollmentFilter.OpenReserved) &&
+                  filter === EnrollmentFilter.ReservedSeats) &&
                 reservedSeatGroups.length === 0,
             }))}
           />

@@ -335,7 +335,9 @@ export default function ClassCard({
                             <InfoCircle className={styles.reservedSeatingIcon} />
                             {openReservedMatch && reservedSeatsRemaining > 0
                               ? `${reservedSeatsRemaining.toLocaleString()} Rsvd`
-                              : "Rsvd"}
+                              : reservedMatch
+                                ? "0 Rsvd"
+                                : "Rsvd"}
                           </span>
                         }
                         title="Reserved Seating"

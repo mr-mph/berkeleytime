@@ -352,16 +352,15 @@ const applyInMemoryFilters = (
             }
           }
           break;
-        case "OPEN_RESERVED": {
+        case "OPEN_RESERVED":
+        case "RESERVED_SEATS": {
           const groups = filters.reservedSeatGroups ?? [];
           if (groups.length === 0) return false;
           const selected = new Set(groups);
-          const hasOpenMatch = (item.seatReservations ?? []).some(
-            (reservation) =>
-              selected.has(reservation.description) &&
-              reservation.enrolledCount < reservation.maxEnroll
+          const hasMatch = (item.seatReservations ?? []).some((reservation) =>
+            selected.has(reservation.description)
           );
-          if (!hasOpenMatch) return false;
+          if (!hasMatch) return false;
           break;
         }
         case "OPEN_FOR_YOU": {
@@ -388,6 +387,7 @@ const applyInMemoryFilters = (
       filters.reservedSeatGroups &&
       filters.reservedSeatGroups.length > 0 &&
       filters.enrollmentFilter !== "OPEN_RESERVED" &&
+      filters.enrollmentFilter !== "RESERVED_SEATS" &&
       filters.enrollmentFilter !== "OPEN_FOR_YOU"
     ) {
       const selected = new Set(filters.reservedSeatGroups);
@@ -571,32 +571,14 @@ const buildFilterQuery = (
           ],
         });
         break;
-      case "OPEN_RESERVED": {
+      case "OPEN_RESERVED":
+      case "RESERVED_SEATS": {
         const groups = filters.reservedSeatGroups ?? [];
         if (groups.length === 0) {
-          // No identity selected — match nothing
           appendAndCondition(query, { _id: { $exists: false } });
         } else {
           appendAndCondition(query, {
-            $expr: {
-              $gt: [
-                {
-                  $size: {
-                    $filter: {
-                      input: { $ifNull: ["$seatReservations", []] },
-                      as: "r",
-                      cond: {
-                        $and: [
-                          { $in: ["$$r.description", groups] },
-                          { $lt: ["$$r.enrolledCount", "$$r.maxEnroll"] },
-                        ],
-                      },
-                    },
-                  },
-                },
-                0,
-              ],
-            },
+            "seatReservations.description": { $in: groups },
           });
         }
         break;
@@ -655,6 +637,7 @@ const buildFilterQuery = (
     filters.reservedSeatGroups &&
     filters.reservedSeatGroups.length > 0 &&
     filters.enrollmentFilter !== "OPEN_RESERVED" &&
+    filters.enrollmentFilter !== "RESERVED_SEATS" &&
     filters.enrollmentFilter !== "OPEN_FOR_YOU"
   ) {
     appendAndCondition(query, {

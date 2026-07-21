@@ -118,7 +118,7 @@ export function ReservedSeatingHoverCard({
                         isOpenMatch
                           ? Color.Green
                           : isFullMatch || isFull
-                            ? Color.Red
+                            ? Color.Rose
                             : Color.Gray
                       }
                     />
