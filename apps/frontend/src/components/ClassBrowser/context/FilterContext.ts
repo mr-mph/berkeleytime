@@ -33,6 +33,7 @@ export interface FilterContextType {
   effectiveOrder: "asc" | "desc";
   enrollmentFilter: EnrollmentFilter | null;
   online: boolean;
+  reservedSeatGroups: string[];
   filterOptions: ICatalogFilterOptions | null;
   scheduleConflictFilter: string | null;
   updateUnits: Dispatch<UnitRange>;
@@ -48,6 +49,7 @@ export interface FilterContextType {
   updateOnline: Dispatch<boolean>;
   updateReverse: Dispatch<SetStateAction<boolean>>;
   updateScheduleConflictFilter: Dispatch<string | null>;
+  updateReservedSeatGroups: Dispatch<string[]>;
 }
 
 export const FilterContext = createContext<FilterContextType | null>(null);

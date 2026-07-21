@@ -119,6 +119,15 @@
   cursor: pointer;
 }
 
+.reservedSeatingHighlight {
+  color: var(--green-600, #16a34a);
+  font-weight: 600;
+
+  .reservedSeatingIcon {
+    color: var(--green-600, #16a34a);
+  }
+}
+
 .reservedSeatingIcon {
   color: var(--paragraph-color);
   width: 14px;

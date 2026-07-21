@@ -54,6 +54,7 @@ const adaptForClassCard = (_class: ICatalogClassServer) => {
           enrolledCount: _class.enrolledCount,
           maxEnroll: _class.maxEnroll,
           activeReservedMaxCount: _class.activeReservedMaxCount,
+          seatReservations: _class.seatReservations ?? undefined,
           endTime: _class.enrollmentUpdatedAt ?? undefined,
         },
       },

@@ -140,6 +140,7 @@ export default function useCatalogBrowser({
       effectiveOrder: filterState.effectiveOrder,
       enrollmentFilter: filterState.enrollmentFilter,
       online: filterState.online,
+      reservedSeatGroups: filterState.reservedSeatGroups,
       filterOptions: queryResult.filterOptions,
       scheduleConflictFilter: filterState.scheduleConflictFilter,
       updateUnits: filterState.updateUnits,
@@ -155,6 +156,7 @@ export default function useCatalogBrowser({
       updateOnline: filterState.updateOnline,
       updateReverse: filterState.updateReverse,
       updateScheduleConflictFilter: filterState.updateScheduleConflictFilter,
+      updateReservedSeatGroups: filterState.updateReservedSeatGroups,
     }),
     [year, semester, terms, filterState, queryResult.filterOptions]
   );

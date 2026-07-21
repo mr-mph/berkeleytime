@@ -24,6 +24,12 @@ import Units from "@/components/Units";
 import { IClass, IClassCourse } from "@/lib/api";
 import { IEnrollmentSingular } from "@/lib/api/enrollment";
 import { Color, Semester } from "@/lib/generated/graphql";
+import {
+  findBestOpenMatch,
+  formatReservedSeatsRemaining,
+  getReservedSeatsRemaining,
+  getSelectedReservedSeatGroups,
+} from "@/lib/reservedSeatGroups";
 
 import styles from "./ClassCard.module.scss";
 
@@ -73,7 +79,13 @@ type CourseSummary = Pick<IClassCourse, "title" | "gradeDistribution"> & {
 type EnrollmentSnapshot = Pick<
   IEnrollmentSingular,
   "enrolledCount" | "maxEnroll" | "endTime" | "activeReservedMaxCount"
->;
+> & {
+  seatReservations?: {
+    description: string;
+    enrolledCount: number;
+    maxEnroll: number;
+  }[];
+};
 
 type ClassCardClass = Partial<BaseClassFields> & {
   year?: number;
@@ -143,6 +155,12 @@ export default function ClassCard({
   const activeReservedMaxCount =
     _class?.primarySection?.enrollment?.latest?.activeReservedMaxCount ?? 0;
   const maxEnroll = _class?.primarySection?.enrollment?.latest?.maxEnroll ?? 0;
+  const seatReservations =
+    _class?.primarySection?.enrollment?.latest?.seatReservations;
+  const openReservedMatch = findBestOpenMatch(
+    seatReservations,
+    getSelectedReservedSeatGroups()
+  );
   const ratingsCount = _class?.course?.aggregatedRatings
     ? Math.max(
         0,
@@ -294,13 +312,24 @@ export default function ClassCard({
                       ?.activeReservedMaxCount ?? 0) > 0 && (
                       <Tooltip
                         trigger={
-                          <span className={styles.reservedSeating}>
+                          <span
+                            className={classNames(styles.reservedSeating, {
+                              [styles.reservedSeatingHighlight]:
+                                !!openReservedMatch,
+                            })}
+                          >
                             <InfoCircle className={styles.reservedSeatingIcon} />
-                            Rsvd
+                            {openReservedMatch
+                              ? `${getReservedSeatsRemaining(openReservedMatch.enrolledCount, openReservedMatch.maxEnroll).toLocaleString()} Rsvd`
+                              : "Rsvd"}
                           </span>
                         }
                         title="Reserved Seating"
-                        description={`${activeReservedMaxCount.toLocaleString()} out of ${maxEnroll.toLocaleString()} seats for this class are reserved.`}
+                        description={
+                          openReservedMatch
+                            ? `${openReservedMatch.description}: ${formatReservedSeatsRemaining(openReservedMatch.enrolledCount, openReservedMatch.maxEnroll)} reserved seats left.`
+                            : `${activeReservedMaxCount.toLocaleString()} out of ${maxEnroll.toLocaleString()} seats for this class are reserved.`
+                        }
                       />
                     )}
                   {ratingsCount > 0 && (

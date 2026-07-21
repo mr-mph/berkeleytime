@@ -22,36 +22,6 @@ import {
 
 const MANUAL_REFRESH_GRANULARITY_SECONDS = 60;
 
-const computeActiveReservedMaxCount = (
-  seatReservationCount:
-    | Array<{ number?: number; maxEnroll?: number }>
-    | undefined,
-  seatReservationTypes: Array<{ number?: number; fromDate?: string }> | undefined
-): number => {
-  const counts = seatReservationCount ?? [];
-  if (counts.length === 0) return 0;
-
-  const types = seatReservationTypes ?? [];
-  const now = new Date();
-
-  return counts.reduce((sum, reservation) => {
-    const maxEnroll = reservation.maxEnroll ?? 0;
-    const matchingType = types.find(
-      (type) => type.number === reservation.number
-    );
-    const fromDate = matchingType?.fromDate ?? "";
-    const fromDateObj = fromDate ? new Date(fromDate) : null;
-    const hasValidFromDate =
-      fromDateObj !== null && !Number.isNaN(fromDateObj.getTime());
-
-    const isActive =
-      maxEnroll > 1 &&
-      (!hasValidFromDate || (fromDateObj && fromDateObj <= now));
-
-    return sum + (isActive ? maxEnroll : 0);
-  }, 0);
-};
-
 const enrollmentCountsEqual = (
   a: {
     status?: string;
@@ -156,9 +126,40 @@ const persistScrapedSectionEnrollment = async (
     await enrollmentDoc.save();
   }
 
-  const activeReservedMaxCount = computeActiveReservedMaxCount(
-    historyPoint.seatReservationCount,
-    enrollmentDoc.seatReservationTypes
+  const seatReservations = (() => {
+    const counts = historyPoint.seatReservationCount ?? [];
+    const types = enrollmentDoc.seatReservationTypes ?? [];
+    const nowDate = now;
+    const result: {
+      description: string;
+      enrolledCount: number;
+      maxEnroll: number;
+    }[] = [];
+    for (const reservation of counts) {
+      const maxEnroll = reservation.maxEnroll ?? 0;
+      const matchingType = types.find(
+        (type) => type.number === reservation.number
+      );
+      const fromDate = matchingType?.fromDate ?? "";
+      const fromDateObj = fromDate ? new Date(fromDate) : null;
+      const hasValidFromDate =
+        fromDateObj !== null && !Number.isNaN(fromDateObj.getTime());
+      const isActive =
+        maxEnroll > 1 &&
+        (!hasValidFromDate || (fromDateObj !== null && fromDateObj <= nowDate));
+      if (!isActive) continue;
+      result.push({
+        description:
+          matchingType?.requirementGroup?.description?.trim() || "Unknown",
+        enrolledCount: reservation.enrolledCount ?? 0,
+        maxEnroll,
+      });
+    }
+    return result;
+  })();
+  const activeReservedMaxCount = seatReservations.reduce(
+    (sum, reservation) => sum + reservation.maxEnroll,
+    0
   );
   const openSeats = Math.max(
     0,
@@ -180,6 +181,7 @@ const persistScrapedSectionEnrollment = async (
           waitlistedCount: historyPoint.waitlistedCount,
           maxWaitlist: historyPoint.maxWaitlist,
           activeReservedMaxCount,
+          seatReservations,
           openSeats,
           enrollmentUpdatedAt: now,
         },

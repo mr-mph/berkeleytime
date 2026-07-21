@@ -21,6 +21,8 @@ export const catalogTypeDef = gql`
     OPEN
     NON_RESERVED_OPEN
     WAITLIST_OPEN
+    OPEN_RESERVED
+    EXCLUSIVE_RESERVED_SEATS
   }
 
   input CatalogCourseIdentifierInput {
@@ -42,6 +44,8 @@ export const catalogTypeDef = gql`
     universityRequirements: [String!]
     courseIdentifiers: [CatalogCourseIdentifierInput!]
     online: Boolean
+    "Requirement-group descriptions the user identifies with (filter-as-identity)."
+    reservedSeatGroups: [String!]
   }
 
   type CatalogMeeting {
@@ -155,6 +159,8 @@ export const catalogTypeDef = gql`
     waitlistedCount: Int
     maxWaitlist: Int
     activeReservedMaxCount: Int
+    "Active reserved-seat groups (same labels as Reserved Seating hover card)"
+    seatReservations: [CatalogSeatReservation!]
     "When primary enrollment was last scraped/updated"
     enrollmentUpdatedAt: ISODate
 
@@ -178,6 +184,12 @@ export const catalogTypeDef = gql`
     requirementDesignation: SectionAttributeInfo
   }
 
+  type CatalogSeatReservation {
+    description: String!
+    enrolledCount: Int!
+    maxEnroll: Int!
+  }
+
   type CatalogResult {
     results: [CatalogClass!]!
     totalCount: Int!
@@ -199,6 +211,7 @@ export const catalogTypeDef = gql`
     gradingOptions: [String!]!
     breadthRequirements: [String!]!
     universityRequirements: [String!]!
+    reservedSeatGroups: [String!]!
     semesters: [CatalogSemester!]!
     timeRange: CatalogTimeRange
   }

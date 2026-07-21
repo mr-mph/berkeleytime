@@ -75,9 +75,28 @@ export default function Filters() {
     terms,
     filterOptions,
     updateScheduleConflictFilter,
+    reservedSeatGroups,
+    updateReservedSeatGroups,
   } = useFilterContext();
 
   const navigate = useNavigate();
+
+  // Drop identity selections that have no open reserved seats this term
+  useEffect(() => {
+    const available = filterOptions?.reservedSeatGroups;
+    if (!available) return;
+    const availableSet = new Set(available);
+    const pruned = reservedSeatGroups.filter((group) =>
+      availableSet.has(group)
+    );
+    if (pruned.length !== reservedSeatGroups.length) {
+      updateReservedSeatGroups(pruned);
+    }
+  }, [
+    filterOptions?.reservedSeatGroups,
+    reservedSeatGroups,
+    updateReservedSeatGroups,
+  ]);
 
   const daysFromFilters = useMemo(() => {
     const next = [...EMPTY_DAYS];
@@ -276,6 +295,7 @@ export default function Filters() {
     updateSortBy(SortBy.Relevance);
     updateEnrollmentFilter(null);
     updateScheduleConflictFilter(null);
+    updateReservedSeatGroups([]);
   };
 
   return (
@@ -463,7 +483,31 @@ export default function Filters() {
             options={Object.values(EnrollmentFilter).map((filter) => ({
               value: filter,
               label: filter,
+              disabled:
+                (filter === EnrollmentFilter.OpenReserved ||
+                  filter === EnrollmentFilter.ExclusiveReserved) &&
+                reservedSeatGroups.length === 0,
             }))}
+          />
+        </div>
+        <div className={styles.formControl}>
+          <p className={styles.label}>Reserved seating</p>
+          <Select
+            multi
+            searchable
+            value={reservedSeatGroups}
+            placeholder="Select groups that apply to you"
+            disabled={!filterOptions?.reservedSeatGroups?.length}
+            onChange={(v) => {
+              if (Array.isArray(v)) updateReservedSeatGroups(v);
+            }}
+            options={(filterOptions?.reservedSeatGroups ?? []).map((group) => ({
+              value: group,
+              label: group,
+            }))}
+            searchPlaceholder="Search reserved groups..."
+            emptyMessage="No reserved seat groups for this term."
+            maxListHeight={200}
           />
         </div>
         <ScheduleConflictFilter />

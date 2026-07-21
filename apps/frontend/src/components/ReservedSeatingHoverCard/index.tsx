@@ -1,7 +1,14 @@
+import classNames from "classnames";
 import { SleeperChair } from "iconoir-react";
 import { HoverCard } from "radix-ui";
 
 import { Badge, Color } from "@repo/theme";
+
+import {
+  findBestOpenMatch,
+  formatReservedSeatsRemaining,
+  getSelectedReservedSeatGroups,
+} from "@/lib/reservedSeatGroups";
 
 import styles from "./ReservedSeatingHoverCard.module.scss";
 
@@ -16,11 +23,18 @@ interface SeatReservation {
 
 interface ReservedSeatingHoverCardProps {
   seatReservationCount: SeatReservation[];
+  /** Override selected groups; defaults to localStorage identity. */
+  highlightedDescriptions?: string[];
 }
 
 export function ReservedSeatingHoverCard({
   seatReservationCount,
+  highlightedDescriptions,
 }: ReservedSeatingHoverCardProps) {
+  const selected =
+    highlightedDescriptions ?? getSelectedReservedSeatGroups();
+  const selectedSet = new Set(selected);
+
   const validReservations = seatReservationCount
     .filter((r) => r.isValid)
     .sort((a, b) => {
@@ -36,10 +50,25 @@ export function ReservedSeatingHoverCard({
       return b.maxEnroll - a.maxEnroll;
     });
 
+  const hasOpenHighlight =
+    findBestOpenMatch(
+      validReservations.map((r) => ({
+        description: r.requirementGroup.description,
+        enrolledCount: r.enrolledCount,
+        maxEnroll: r.maxEnroll,
+      })),
+      selected
+    ) !== null;
+
   return (
     <HoverCard.Root openDelay={200} closeDelay={100}>
       <HoverCard.Trigger asChild>
-        <button type="button" className={styles.trigger}>
+        <button
+          type="button"
+          className={classNames(styles.trigger, {
+            [styles.triggerHighlight]: hasOpenHighlight,
+          })}
+        >
           <SleeperChair width={14} height={14} />
           <span>Reserved Seating</span>
         </button>
@@ -55,6 +84,10 @@ export function ReservedSeatingHoverCard({
           <div className={styles.content}>
             {validReservations.map((reservation, index) => {
               const isFull = reservation.enrolledCount >= reservation.maxEnroll;
+              const isSelected = selectedSet.has(
+                reservation.requirementGroup.description
+              );
+              const isOpenMatch = isSelected && !isFull;
 
               return (
                 <div key={index} className={styles.group}>
@@ -63,8 +96,17 @@ export function ReservedSeatingHoverCard({
                   </span>
                   <div className={styles.badgeContainer}>
                     <Badge
-                      label={`${reservation.enrolledCount}/${reservation.maxEnroll} enrolled`}
-                      color={isFull ? Color.Red : Color.Gray}
+                      label={formatReservedSeatsRemaining(
+                        reservation.enrolledCount,
+                        reservation.maxEnroll
+                      )}
+                      color={
+                        isOpenMatch
+                          ? Color.Green
+                          : isFull
+                            ? Color.Red
+                            : Color.Gray
+                      }
                     />
                   </div>
                 </div>

@@ -112,6 +112,12 @@ export interface ICatalogClassItem {
   waitlistedCount?: number;
   maxWaitlist?: number;
   activeReservedMaxCount?: number;
+  /** Active reserved-seat groups (requirementGroup.description + counts). */
+  seatReservations?: {
+    description: string;
+    enrolledCount: number;
+    maxEnroll: number;
+  }[];
   /** When primary enrollment was last scraped/updated. */
   enrollmentUpdatedAt?: Date | null;
 
@@ -251,6 +257,14 @@ const catalogClassSchema = new Schema<ICatalogClassItem>(
     waitlistedCount: { type: Number },
     maxWaitlist: { type: Number },
     activeReservedMaxCount: { type: Number },
+    seatReservations: [
+      {
+        _id: false,
+        description: { type: String },
+        enrolledCount: { type: Number },
+        maxEnroll: { type: Number },
+      },
+    ],
     enrollmentUpdatedAt: { type: Date, default: null },
 
     // Secondary sections

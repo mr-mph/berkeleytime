@@ -19,6 +19,9 @@ import {
 
 import { updateCatalogEnrollment } from "../lib/catalog-denormalize";
 import { isSectionEnrollmentBlankInDb } from "../lib/crosslisting-enrollment-fanout";
+import {
+  buildActiveSeatReservations,
+} from "../lib/enrollment-utils";
 import { Config } from "../shared/config";
 import { getActiveTerms } from "../shared/term-selectors";
 
@@ -67,36 +70,6 @@ const writeScrapeProgress = async (update: ProgressUpdate) => {
   );
 };
 
-const computeActiveReservedMaxCount = (
-  seatReservationCount:
-    | Array<{ number?: number; maxEnroll?: number }>
-    | undefined,
-  seatReservationTypes: Array<{ number?: number; fromDate?: string }> | undefined
-): number => {
-  const counts = seatReservationCount ?? [];
-  if (counts.length === 0) return 0;
-
-  const types = seatReservationTypes ?? [];
-  const now = new Date();
-
-  return counts.reduce((sum, reservation) => {
-    const maxEnroll = reservation.maxEnroll ?? 0;
-    const matchingType = types.find(
-      (type) => type.number === reservation.number
-    );
-    const fromDate = matchingType?.fromDate ?? "";
-    const fromDateObj = fromDate ? new Date(fromDate) : null;
-    const hasValidFromDate =
-      fromDateObj !== null && !Number.isNaN(fromDateObj.getTime());
-
-    const isActive =
-      maxEnroll > 1 &&
-      (!hasValidFromDate || (fromDateObj && fromDateObj <= now));
-
-    return sum + (isActive ? maxEnroll : 0);
-  }, 0);
-};
-
 const enrollmentCountsEqual = (
   a: {
     status?: string;
@@ -132,6 +105,11 @@ type CatalogEnrollmentPatch = {
   waitlistedCount?: number;
   maxWaitlist?: number;
   activeReservedMaxCount?: number;
+  seatReservations?: {
+    description: string;
+    enrolledCount: number;
+    maxEnroll: number;
+  }[];
   enrollmentUpdatedAt?: Date;
 };
 
@@ -233,9 +211,13 @@ const persistScrapedSectionEnrollment = async (
 
   if (lastError) throw lastError;
 
-  const activeReservedMaxCount = computeActiveReservedMaxCount(
+  const seatReservations = buildActiveSeatReservations(
     historyPoint.seatReservationCount,
     seatReservationTypes
+  );
+  const activeReservedMaxCount = seatReservations.reduce(
+    (sum, reservation) => sum + reservation.maxEnroll,
+    0
   );
 
   return {
@@ -249,6 +231,7 @@ const persistScrapedSectionEnrollment = async (
       activeReservedMaxCount: section.primary
         ? activeReservedMaxCount
         : undefined,
+      seatReservations: section.primary ? seatReservations : undefined,
       enrollmentUpdatedAt: now,
     },
   };

@@ -55,6 +55,7 @@ export interface CatalogQueryParams {
       | { subject: string; courseNumber: string }[]
       | null;
     online?: boolean | null;
+    reservedSeatGroups?: string[] | null;
   } | null;
   sortBy?: string | null;
   sortOrder?: string | null;
@@ -351,6 +352,52 @@ const applyInMemoryFilters = (
             }
           }
           break;
+        case "OPEN_RESERVED": {
+          const groups = filters.reservedSeatGroups ?? [];
+          if (groups.length === 0) return false;
+          const selected = new Set(groups);
+          const hasOpenMatch = (item.seatReservations ?? []).some(
+            (reservation) =>
+              selected.has(reservation.description) &&
+              reservation.enrolledCount < reservation.maxEnroll
+          );
+          if (!hasOpenMatch) return false;
+          break;
+        }
+        case "EXCLUSIVE_RESERVED_SEATS": {
+          const groups = filters.reservedSeatGroups ?? [];
+          if (groups.length === 0) return false;
+          const selected = new Set(groups);
+          const hasOpenMatch = (item.seatReservations ?? []).some(
+            (reservation) =>
+              selected.has(reservation.description) &&
+              reservation.enrolledCount < reservation.maxEnroll
+          );
+          if (!hasOpenMatch) return false;
+          const nonReservedOpen =
+            item.enrollmentStatus === "O" &&
+            (item.maxEnroll ?? 0) - (item.enrolledCount ?? 0) >
+              (item.activeReservedMaxCount ?? 0);
+          if (nonReservedOpen) return false;
+          break;
+        }
+      }
+    }
+
+    // Reserved-seat group filter (class has any selected classification)
+    if (
+      filters.reservedSeatGroups &&
+      filters.reservedSeatGroups.length > 0 &&
+      filters.enrollmentFilter !== "OPEN_RESERVED" &&
+      filters.enrollmentFilter !== "EXCLUSIVE_RESERVED_SEATS"
+    ) {
+      const selected = new Set(filters.reservedSeatGroups);
+      if (
+        !(item.seatReservations ?? []).some((reservation) =>
+          selected.has(reservation.description)
+        )
+      ) {
+        return false;
       }
     }
 
@@ -525,7 +572,90 @@ const buildFilterQuery = (
           ],
         });
         break;
+      case "OPEN_RESERVED": {
+        const groups = filters.reservedSeatGroups ?? [];
+        if (groups.length === 0) {
+          // No identity selected — match nothing
+          appendAndCondition(query, { _id: { $exists: false } });
+        } else {
+          appendAndCondition(query, {
+            $expr: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: { $ifNull: ["$seatReservations", []] },
+                      as: "r",
+                      cond: {
+                        $and: [
+                          { $in: ["$$r.description", groups] },
+                          { $lt: ["$$r.enrolledCount", "$$r.maxEnroll"] },
+                        ],
+                      },
+                    },
+                  },
+                },
+                0,
+              ],
+            },
+          });
+        }
+        break;
+      }
+      case "EXCLUSIVE_RESERVED_SEATS": {
+        const groups = filters.reservedSeatGroups ?? [];
+        if (groups.length === 0) {
+          appendAndCondition(query, { _id: { $exists: false } });
+        } else {
+          appendAndCondition(query, {
+            $or: [
+              { enrollmentStatus: { $ne: "O" } },
+              {
+                $expr: {
+                  $lte: [
+                    { $subtract: ["$maxEnroll", "$enrolledCount"] },
+                    { $ifNull: ["$activeReservedMaxCount", 0] },
+                  ],
+                },
+              },
+            ],
+          });
+          appendAndCondition(query, {
+            $expr: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: { $ifNull: ["$seatReservations", []] },
+                      as: "r",
+                      cond: {
+                        $and: [
+                          { $in: ["$$r.description", groups] },
+                          { $lt: ["$$r.enrolledCount", "$$r.maxEnroll"] },
+                        ],
+                      },
+                    },
+                  },
+                },
+                0,
+              ],
+            },
+          });
+        }
+        break;
+      }
     }
+  }
+
+  // Reserved-seat group filter (any matching classification on the class)
+  if (
+    filters.reservedSeatGroups &&
+    filters.reservedSeatGroups.length > 0 &&
+    filters.enrollmentFilter !== "OPEN_RESERVED"
+  ) {
+    appendAndCondition(query, {
+      "seatReservations.description": { $in: filters.reservedSeatGroups },
+    });
   }
 
   // Grading filter
@@ -601,7 +731,7 @@ export const getCatalogFilterOptions = async (
   year: number,
   semester: string
 ) => {
-  const [filterAgg, semesters] = await Promise.all([
+  const [filterAgg, reservedSeatGroupsAgg, semesters] = await Promise.all([
     CatalogClassModel.aggregate([
       { $match: { year, semester } },
       {
@@ -634,6 +764,39 @@ export const getCatalogFilterOptions = async (
         },
       },
     ]),
+    // Only groups with ≥1 class that still has open reserved seats this term
+    CatalogClassModel.aggregate([
+      {
+        $match: {
+          year,
+          semester,
+          "seatReservations.0": { $exists: true },
+        },
+      },
+      { $unwind: "$seatReservations" },
+      {
+        $match: {
+          "seatReservations.description": {
+            $type: "string",
+            $nin: ["", "Unknown"],
+          },
+          $expr: {
+            $lt: [
+              "$seatReservations.enrolledCount",
+              "$seatReservations.maxEnroll",
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          reservedSeatGroups: {
+            $addToSet: "$seatReservations.description",
+          },
+        },
+      },
+    ]),
     TermModel.find({ hasCatalogData: true }).select({ name: 1 }).lean(),
   ]);
 
@@ -647,6 +810,12 @@ export const getCatalogFilterOptions = async (
   const uniReqs = result
     ? (result.universityRequirements as string[]).filter(Boolean).sort()
     : [];
+  const reservedSeatGroups = (
+    (reservedSeatGroupsAgg[0]?.reservedSeatGroups as string[] | undefined) ??
+    []
+  )
+    .filter(Boolean)
+    .sort();
 
   const semesterList = semesters
     .map((t) => parseTermName(t.name))
@@ -681,6 +850,7 @@ export const getCatalogFilterOptions = async (
     gradingOptions: (result?.gradingOptions ?? []).filter(Boolean).sort(),
     breadthRequirements: breadths,
     universityRequirements: uniReqs,
+    reservedSeatGroups,
     semesters: semesterList,
     timeRange,
   };

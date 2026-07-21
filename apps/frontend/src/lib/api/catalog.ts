@@ -47,6 +47,11 @@ export const GET_CATALOG_SEARCH = gql`
         maxEnroll
         activeReservedMaxCount
         enrollmentUpdatedAt
+        seatReservations {
+          description
+          enrolledCount
+          maxEnroll
+        }
         rmpAverageRating
         rmpMatchedInstructorCount
         aggregatedRatings {
@@ -88,6 +93,7 @@ export const GET_CATALOG_FILTER_OPTIONS = gql`
       gradingOptions
       breadthRequirements
       universityRequirements
+      reservedSeatGroups
       timeRange {
         minStartTime
         maxEndTime

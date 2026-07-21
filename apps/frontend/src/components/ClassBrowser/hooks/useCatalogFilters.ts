@@ -2,6 +2,7 @@ import {
   Dispatch,
   SetStateAction,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -19,6 +20,12 @@ import {
 
 import type { ICatalogFilters } from "@/lib/api/catalog";
 import type { GetCatalogSearchQueryVariables } from "@/lib/generated/graphql";
+import {
+  getSelectedReservedSeatGroups,
+  readReservedSeatGroupsFromSearchParams,
+  setSelectedReservedSeatGroups,
+  writeReservedSeatGroupsToSearchParams,
+} from "@/lib/reservedSeatGroups";
 
 import {
   Day,
@@ -86,6 +93,10 @@ export const mapEnrollmentFilter = (
       return "NON_RESERVED_OPEN" as CatalogEnrollmentFilter;
     case EnrollmentFilter.WaitlistOpen:
       return "WAITLIST_OPEN" as CatalogEnrollmentFilter;
+    case EnrollmentFilter.OpenReserved:
+      return "OPEN_RESERVED" as CatalogEnrollmentFilter;
+    case EnrollmentFilter.ExclusiveReserved:
+      return "EXCLUSIVE_RESERVED_SEATS" as CatalogEnrollmentFilter;
     default:
       return undefined;
   }
@@ -138,6 +149,7 @@ export interface CatalogFilterState {
   effectiveOrder: "asc" | "desc";
   enrollmentFilter: EnrollmentFilter | null;
   online: boolean;
+  reservedSeatGroups: string[];
   scheduleConflictFilter: string | null;
   hasActiveFilters: boolean;
   filterVariables: ICatalogFilters | undefined;
@@ -158,6 +170,7 @@ export interface CatalogFilterUpdaters {
   updateOnline: Dispatch<boolean>;
   updateReverse: Dispatch<SetStateAction<boolean>>;
   updateScheduleConflictFilter: Dispatch<string | null>;
+  updateReservedSeatGroups: Dispatch<string[]>;
 }
 
 export type UseCatalogFiltersReturn = CatalogFilterState &
@@ -189,6 +202,9 @@ export default function useCatalogFilters({
   const [localEnrollmentFilter, setLocalEnrollmentFilter] =
     useState<EnrollmentFilter | null>(null);
   const [localOnline, setLocalOnline] = useState<boolean>(false);
+  const [localReservedSeatGroups, setLocalReservedSeatGroups] = useState<
+    string[]
+  >(() => getSelectedReservedSeatGroups());
   const [localScheduleConflictFilter, setLocalScheduleConflictFilter] =
     useState<string | null>(null);
 
@@ -320,6 +336,24 @@ export default function useCatalogFilters({
     [searchParams, localOnline, persistent]
   );
 
+  const reservedSeatGroups = useMemo(() => {
+    if (persistent) {
+      const fromUrl = readReservedSeatGroupsFromSearchParams(searchParams);
+      if (fromUrl.length > 0) return fromUrl;
+    }
+    return localReservedSeatGroups;
+  }, [searchParams, localReservedSeatGroups, persistent]);
+
+  // Keep localStorage identity in sync when URL is the source of truth
+  useEffect(() => {
+    if (!persistent) return;
+    const fromUrl = readReservedSeatGroupsFromSearchParams(searchParams);
+    if (fromUrl.length > 0) {
+      setSelectedReservedSeatGroups(fromUrl);
+      setLocalReservedSeatGroups(fromUrl);
+    }
+  }, [persistent, searchParams]);
+
   // Build server-side filter variables
   const filterVariables = useMemo<ICatalogFilters | undefined>(() => {
     const filters: NonNullable<ICatalogFilters> = {};
@@ -370,6 +404,15 @@ export default function useCatalogFilters({
 
     if (online) filters.online = true;
 
+    // Identity groups only hit the server for reserved-seat enrollment filters.
+    if (
+      (enrollmentFilter === EnrollmentFilter.OpenReserved ||
+        enrollmentFilter === EnrollmentFilter.ExclusiveReserved) &&
+      reservedSeatGroups.length > 0
+    ) {
+      filters.reservedSeatGroups = reservedSeatGroups;
+    }
+
     return Object.keys(filters).length > 0 ? filters : undefined;
   }, [
     levels,
@@ -382,6 +425,7 @@ export default function useCatalogFilters({
     universityRequirements,
     eecsRequirements,
     online,
+    reservedSeatGroups,
   ]);
 
   const hasActiveFilters =
@@ -397,6 +441,7 @@ export default function useCatalogFilters({
     gradingFilters.length > 0 ||
     enrollmentFilter !== null ||
     online ||
+    reservedSeatGroups.length > 0 ||
     sortBy !== SortBy.Relevance ||
     localScheduleConflictFilter !== null;
 
@@ -495,6 +540,7 @@ export default function useCatalogFilters({
     effectiveOrder,
     enrollmentFilter,
     online,
+    reservedSeatGroups,
     hasActiveFilters,
     filterVariables,
     // Updaters
@@ -539,5 +585,29 @@ export default function useCatalogFilters({
     updateReverse: setLocalReverse,
     scheduleConflictFilter: localScheduleConflictFilter,
     updateScheduleConflictFilter: setLocalScheduleConflictFilter,
+    updateReservedSeatGroups: (groups) => {
+      setSelectedReservedSeatGroups(groups);
+      setLocalReservedSeatGroups(groups);
+      if (persistent) {
+        writeReservedSeatGroupsToSearchParams(searchParams, groups);
+        if (groups.length === 0) {
+          if (
+            searchParams.get("enrollmentFilter") ===
+              EnrollmentFilter.OpenReserved ||
+            searchParams.get("enrollmentFilter") ===
+              EnrollmentFilter.ExclusiveReserved
+          ) {
+            searchParams.delete("enrollmentFilter");
+          }
+        }
+        setSearchParams(searchParams);
+      } else if (
+        groups.length === 0 &&
+        (localEnrollmentFilter === EnrollmentFilter.OpenReserved ||
+          localEnrollmentFilter === EnrollmentFilter.ExclusiveReserved)
+      ) {
+        setLocalEnrollmentFilter(null);
+      }
+    },
   };
 }

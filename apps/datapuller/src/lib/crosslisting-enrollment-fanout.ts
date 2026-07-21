@@ -8,7 +8,7 @@ import { isBlankUcbEnrollment } from "@repo/shared";
 
 import type { Config } from "../shared/config";
 import { updateCatalogEnrollment } from "./catalog-denormalize";
-import { computeActiveReservedMaxCount } from "./enrollment-utils";
+import { buildActiveSeatReservations } from "./enrollment-utils";
 
 type LatestEnrollment = {
   doc: IEnrollmentHistoryItem;
@@ -135,6 +135,11 @@ const applyDonorToSection = async (
     waitlistedCount?: number;
     maxWaitlist?: number;
     activeReservedMaxCount?: number;
+    seatReservations?: {
+      description: string;
+      enrolledCount: number;
+      maxEnroll: number;
+    }[];
     enrollmentUpdatedAt?: Date;
   };
 }> => {
@@ -204,9 +209,13 @@ const applyDonorToSection = async (
     await enrollmentDoc.save();
   }
 
-  const activeReservedMaxCount = computeActiveReservedMaxCount(
+  const seatReservations = buildActiveSeatReservations(
     historyPoint.seatReservationCount,
     enrollmentDoc.seatReservationTypes
+  );
+  const activeReservedMaxCount = seatReservations.reduce(
+    (sum, reservation) => sum + reservation.maxEnroll,
+    0
   );
 
   return {
@@ -220,6 +229,7 @@ const applyDonorToSection = async (
       activeReservedMaxCount: section.primary
         ? activeReservedMaxCount
         : undefined,
+      seatReservations: section.primary ? seatReservations : undefined,
       enrollmentUpdatedAt: now,
     },
   };
@@ -302,6 +312,11 @@ export const fanOutCrosslistingEnrollmentForTerm = async (
       waitlistedCount?: number;
       maxWaitlist?: number;
       activeReservedMaxCount?: number;
+      seatReservations?: {
+        description: string;
+        enrolledCount: number;
+        maxEnroll: number;
+      }[];
       enrollmentUpdatedAt?: Date;
     }
   >();

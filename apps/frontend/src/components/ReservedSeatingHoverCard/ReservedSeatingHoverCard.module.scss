@@ -45,6 +45,11 @@
   }
 }
 
+.triggerHighlight {
+  color: var(--green-600, #16a34a);
+  font-weight: var(--font-medium);
+}
+
 .header {
   padding: 8px 12px;
   font-size: var(--text-14);

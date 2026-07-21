@@ -9,7 +9,10 @@ import {
 
 import { updateCatalogEnrollment } from "../lib/catalog-denormalize";
 import { GRANULARITY, getEnrollmentSingulars } from "../lib/enrollment";
-import { computeActiveReservedMaxCount } from "../lib/enrollment-utils";
+import {
+  buildActiveSeatReservations,
+  computeActiveReservedMaxCount,
+} from "../lib/enrollment-utils";
 import { Config } from "../shared/config";
 
 // duration of time in seconds that can pass before being considered a data gap
@@ -349,12 +352,21 @@ const updateEnrollmentHistories = async (config: Config) => {
         waitlistedCount?: number;
         maxWaitlist?: number;
         activeReservedMaxCount?: number;
+        seatReservations?: {
+          description: string;
+          enrolledCount: number;
+          maxEnroll: number;
+        }[];
       }
     >();
 
     for (const hist of histories) {
       const latest = hist.history?.[0];
       if (!latest) continue;
+      const seatReservations = buildActiveSeatReservations(
+        latest.seatReservationCount,
+        hist.seatReservationTypes
+      );
       termEnrollments.set(hist.sectionId, {
         status: latest.status,
         enrolledCount: latest.enrolledCount,
@@ -365,6 +377,7 @@ const updateEnrollmentHistories = async (config: Config) => {
           latest.seatReservationCount,
           hist.seatReservationTypes
         ),
+        seatReservations,
       });
     }
 

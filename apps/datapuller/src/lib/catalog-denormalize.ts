@@ -30,7 +30,7 @@ import {
 } from "@repo/shared";
 
 import { Config } from "../shared/config";
-import { computeActiveReservedMaxCount } from "./enrollment-utils";
+import { buildActiveSeatReservations } from "./enrollment-utils";
 
 type AggregatedMetric = {
   metricName: string;
@@ -273,9 +273,13 @@ export const buildCatalogClasses = async (
     const primaryEnrollment = enrollmentMap.get(primarySection.sectionId);
     const latestEnrollment =
       primaryEnrollment?.history?.[primaryEnrollment.history.length - 1];
-    const activeReservedMaxCount = computeActiveReservedMaxCount(
+    const seatReservations = buildActiveSeatReservations(
       latestEnrollment?.seatReservationCount,
       primaryEnrollment?.seatReservationTypes
+    );
+    const activeReservedMaxCount = seatReservations.reduce(
+      (sum, reservation) => sum + reservation.maxEnroll,
+      0
     );
 
     // Compute pre-computed fields
@@ -438,6 +442,7 @@ export const buildCatalogClasses = async (
       waitlistedCount: latestEnrollment?.waitlistedCount,
       maxWaitlist: latestEnrollment?.maxWaitlist,
       activeReservedMaxCount,
+      seatReservations,
       enrollmentUpdatedAt: latestEnrollment?.endTime
         ? new Date(latestEnrollment.endTime)
         : null,
@@ -739,6 +744,11 @@ export const updateCatalogEnrollment = async (
       waitlistedCount?: number;
       maxWaitlist?: number;
       activeReservedMaxCount?: number;
+      seatReservations?: {
+        description: string;
+        enrolledCount: number;
+        maxEnroll: number;
+      }[];
       enrollmentUpdatedAt?: Date;
     }
   >
@@ -764,6 +774,9 @@ export const updateCatalogEnrollment = async (
             waitlistedCount: enrollment.waitlistedCount,
             maxWaitlist: enrollment.maxWaitlist,
             activeReservedMaxCount: enrollment.activeReservedMaxCount,
+            ...(enrollment.seatReservations !== undefined
+              ? { seatReservations: enrollment.seatReservations }
+              : {}),
             openSeats,
             ...(enrollment.enrollmentUpdatedAt
               ? { enrollmentUpdatedAt: enrollment.enrollmentUpdatedAt }
