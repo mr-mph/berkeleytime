@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { VisuallyHidden } from "@radix-ui/themes";
 import classNames from "classnames";
 import { WarningTriangleSolid } from "iconoir-react";
@@ -11,25 +9,12 @@ import styles from "./DeleteAccountDialog.module.scss";
 interface DeleteAccountDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
 }
 
 export function DeleteAccountDialog({
   isOpen,
   onClose,
-  onConfirm,
 }: DeleteAccountDialogProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleConfirm = async () => {
-    setIsProcessing(true);
-    try {
-      await onConfirm();
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Dialog.Portal>
@@ -53,21 +38,16 @@ export function DeleteAccountDialog({
             </div>
           </Dialog.Body>
           <Dialog.Footer>
-            {!isProcessing && (
-              <Button
-                onClick={onClose}
-                variant="tertiary"
-                style={{ color: "var(--paragraph-color)" }}
-              >
-                Cancel
-              </Button>
-            )}
             <Button
-              onClick={handleConfirm}
-              disabled={isProcessing}
-              isDelete={true}
+              onClick={onClose}
+              variant="tertiary"
+              style={{ color: "var(--paragraph-color)" }}
             >
-              {isProcessing ? "Deleting..." : "Yes, delete my account"}
+              Cancel
+            </Button>
+            {/* everyone shares this account, so deletion stays off the table */}
+            <Button disabled isDelete={true}>
+              Nice try
             </Button>
           </Dialog.Footer>
         </Dialog.Card>
