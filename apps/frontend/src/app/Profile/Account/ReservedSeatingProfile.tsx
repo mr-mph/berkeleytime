@@ -252,10 +252,6 @@ export default function ReservedSeatingProfile() {
               setTermsInAttendance(event.target.value);
             }}
           />
-          <p className={styles.hint}>
-            0–2 terms matches &quot;new&quot; first-year or new-transfer pools
-            (not specialty programs like Freshman Edge).
-          </p>
         </div>
 
         <div className={styles.formControl}>
