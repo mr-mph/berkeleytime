@@ -180,6 +180,10 @@ export default function ReservedSeatingProfile() {
             placeholder="e.g. 3"
             onChange={(event) => setTermsInAttendance(event.target.value)}
           />
+          <p className={styles.hint}>
+            0–2 terms (and undergraduate) matches new first-year reserved seats;
+            use the transfer checkbox instead if you are a new transfer.
+          </p>
         </div>
 
         <div className={styles.formControl}>

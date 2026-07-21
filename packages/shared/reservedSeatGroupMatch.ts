@@ -159,7 +159,9 @@ const levelMatch = (
   if (!level) return null;
   const text = description.toLowerCase();
   const hasUndergrad =
-    /\bundergraduate\b|\bfreshman\b|\bfirst year undergraduate\b/.test(text);
+    /\bundergraduate\b|\bfreshman\b|\bfreshmen\b|\bfirst year undergraduate\b/.test(
+      text
+    );
   const hasMasters =
     /\bmaster(?:'s)?\b|\bmasters\b|\bmfa\b|\bmph\b|\bmeng\b|\bm\.eng\b/.test(
       text
@@ -189,6 +191,13 @@ const isTransferGroup = (description: string): boolean =>
 
 const isNewStudentGroup = (description: string): boolean =>
   /\bnew (?:first year )?undergraduate\b|\bnew freshman\b|\bfreshmen\b/i.test(
+    description
+  );
+
+/** Standalone new-first-year pools (no college/major constraint in the label). */
+const isPureNewStudentGroup = (description: string): boolean =>
+  isNewStudentGroup(description) &&
+  !/\bcollege\b|\bschool of\b|\bmajors?\b|\bminors?\b|\bundeclared\b/i.test(
     description
   );
 
@@ -339,8 +348,21 @@ export const scoreReservedSeatGroups = (
       score += 40;
     }
 
-    if (isNewStudentGroup(description) && terms != null && terms > 2) {
+    // "New First Year Undergraduate Students" / new freshman pools:
+    // first-year admits (typically ≤2 terms), not new transfers.
+    const newFirstYearEligible =
+      isNewStudentGroup(description) &&
+      !isNewTransfer &&
+      terms != null &&
+      !Number.isNaN(terms) &&
+      terms <= 2;
+    if (
+      isNewStudentGroup(description) &&
+      (isNewTransfer || (terms != null && terms > 2))
+    ) {
       hardFail = true;
+    } else if (newFirstYearEligible) {
+      score += 40;
     }
 
     if (exclusiveMajorConflict(description, majors)) {
@@ -381,11 +403,16 @@ export const scoreReservedSeatGroups = (
     if (genericTerms) score += 25;
 
     // Must have a specific hook — not undergrad-only noise.
+    // Pure new-first-year labels match on terms; college/major-scoped ones
+    // still need those hits (via collegeCounts / majorHits above).
+    const newFirstYearSignal =
+      newFirstYearEligible && isPureNewStudentGroup(description);
     const hasSpecificSignal =
       majorHits > 0 ||
       minorHits > 0 ||
       collegeCounts ||
       genericTerms ||
+      newFirstYearSignal ||
       (transfer && isNewTransfer && (majorHits > 0 || collegeCounts));
 
     if (hardFail || !hasSpecificSignal || score <= 0) continue;
