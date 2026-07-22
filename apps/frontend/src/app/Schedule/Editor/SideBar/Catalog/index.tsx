@@ -69,6 +69,7 @@ export default function Catalog({
               year={year}
               onSelect={handleSelect}
               forceMode="semi-compact"
+              hideTermPicker
               browser={browser}
               expanded={expanded}
               onExpandedChange={setExpanded}

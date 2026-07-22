@@ -50,6 +50,8 @@ export interface FilterContextType {
   updateReverse: Dispatch<SetStateAction<boolean>>;
   updateScheduleConflictFilter: Dispatch<string | null>;
   updateReservedSeatGroups: Dispatch<string[]>;
+  /** When true, Filters omits the semester/term picker. */
+  hideTermPicker?: boolean;
 }
 
 export const FilterContext = createContext<FilterContextType | null>(null);

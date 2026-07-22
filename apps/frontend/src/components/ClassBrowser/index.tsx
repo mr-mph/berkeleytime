@@ -27,6 +27,8 @@ interface ClassBrowserProps {
   year: number;
   terms?: ITerm[];
   persistent?: boolean;
+  /** Hide semester/term picker (e.g. schedule editor is locked to one term). */
+  hideTermPicker?: boolean;
   /** When provided, filter/search state is owned by the parent (survives unmount). */
   browser?: UseCatalogBrowserReturn;
   expanded?: boolean;
@@ -41,6 +43,7 @@ function ClassBrowserView({
   browser,
   expanded,
   onExpandedChange,
+  hideTermPicker = false,
 }: {
   onSelect: ClassBrowserProps["onSelect"];
   forceMode?: CatalogLayoutMode;
@@ -49,9 +52,10 @@ function ClassBrowserView({
   browser: UseCatalogBrowserReturn;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
+  hideTermPicker?: boolean;
 }) {
   return (
-    <FilterContext value={browser.filters}>
+    <FilterContext value={{ ...browser.filters, hideTermPicker }}>
       <ListContext value={browser.list}>
         <LayoutContext
           value={{
@@ -93,6 +97,7 @@ function ClassBrowserOwned({
   year,
   terms,
   persistent,
+  hideTermPicker,
   expanded: controlledExpanded,
   onExpandedChange,
 }: Omit<ClassBrowserProps, "browser">) {
@@ -115,6 +120,7 @@ function ClassBrowserOwned({
       browser={browser}
       expanded={expanded}
       onExpandedChange={setExpanded}
+      hideTermPicker={hideTermPicker}
     />
   );
 }
@@ -123,6 +129,7 @@ export default function ClassBrowser({
   browser,
   expanded,
   onExpandedChange,
+  hideTermPicker,
   ...props
 }: ClassBrowserProps) {
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(false);
@@ -137,6 +144,7 @@ export default function ClassBrowser({
         browser={browser}
         expanded={expanded ?? uncontrolledExpanded}
         onExpandedChange={onExpandedChange ?? setUncontrolledExpanded}
+        hideTermPicker={hideTermPicker}
       />
     );
   }
@@ -144,6 +152,7 @@ export default function ClassBrowser({
   return (
     <ClassBrowserOwned
       {...props}
+      hideTermPicker={hideTermPicker}
       expanded={expanded}
       onExpandedChange={onExpandedChange}
     />
