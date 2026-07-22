@@ -1,6 +1,6 @@
 # EECStime
 
-EECStime is a modified version of Berkeleytime that improves course discovery, enrollment planning, scheduling, and more for UC Berkeley students.
+EECStime is a modified version of [Berkeleytime](https://github.com/asuc-octo/berkeleytime) that improves course discovery, enrollment planning, scheduling, and more for UC Berkeley students.
 
 ## Modifications
 ### Searching:
