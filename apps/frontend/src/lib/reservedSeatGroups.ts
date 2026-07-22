@@ -1,30 +1,7 @@
-export const RESERVED_SEAT_GROUPS_STORAGE_KEY = "bt.reservedSeatGroups";
-
 export type SeatReservationSummary = {
   description: string;
   enrolledCount: number;
   maxEnroll: number;
-};
-
-export const getSelectedReservedSeatGroups = (): string[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(RESERVED_SEAT_GROUPS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((value): value is string => typeof value === "string");
-  } catch {
-    return [];
-  }
-};
-
-export const setSelectedReservedSeatGroups = (groups: string[]) => {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(
-    RESERVED_SEAT_GROUPS_STORAGE_KEY,
-    JSON.stringify([...new Set(groups)])
-  );
 };
 
 /** Read reserved-seat identity from URL (supports commas/& in group names). */

@@ -90,8 +90,8 @@ export default function Filters() {
     () => new Set(availableReservedSeatGroups),
     [availableReservedSeatGroups]
   );
-  // Dropdown only shows groups available this term; identity in localStorage
-  // can still include groups from other terms.
+  // Dropdown only shows groups available this term; filter state can still
+  // include profile groups that don't apply this term.
   const visibleReservedSeatGroups = useMemo(
     () =>
       reservedSeatGroups.filter((group) =>
@@ -465,7 +465,10 @@ export default function Filters() {
               setActiveRequirementTab(tabValue);
             }}
             onChange={(value) => {
-              if (value === null || (Array.isArray(value) && value.length === 0)) {
+              if (
+                value === null ||
+                (Array.isArray(value) && value.length === 0)
+              ) {
                 clearRequirementFilters();
                 return;
               }
@@ -476,8 +479,10 @@ export default function Filters() {
                   .filter(
                     (
                       selection
-                    ): selection is Extract<RequirementSelection, { type: "breadth" }> =>
-                      selection.type === "breadth"
+                    ): selection is Extract<
+                      RequirementSelection,
+                      { type: "breadth" }
+                    > => selection.type === "breadth"
                   )
                   .map((selection) => selection.value)
               );
@@ -498,8 +503,10 @@ export default function Filters() {
                 .filter(
                   (
                     selection
-                  ): selection is Extract<RequirementSelection, { type: "eecs" }> =>
-                    selection.type === "eecs"
+                  ): selection is Extract<
+                    RequirementSelection,
+                    { type: "eecs" }
+                  > => selection.type === "eecs"
                 )
                 .map((selection) => selection.value);
               updateEecsRequirements(nextEecs);
@@ -549,7 +556,7 @@ export default function Filters() {
                 !user
                   ? "Sign in to load from profile"
                   : !(user.reservedSeatGroups?.length > 0)
-                    ? "Set up reserved seating on your Account page"
+                    ? "Set up reserved seating profile on your Account page"
                     : "Load from Profile"
               }
               trigger={
@@ -557,9 +564,7 @@ export default function Filters() {
                   <IconButton
                     type="button"
                     aria-label="Load reserved seating from profile"
-                    disabled={
-                      !user || !(user.reservedSeatGroups?.length > 0)
-                    }
+                    disabled={!user || !(user.reservedSeatGroups?.length > 0)}
                     onClick={() => {
                       if (!user?.reservedSeatGroups?.length) return;
                       updateReservedSeatGroups(user.reservedSeatGroups);
@@ -580,7 +585,7 @@ export default function Filters() {
             onOpenChange={handleReservedMenuOpenChange}
             onChange={(v) => {
               if (!Array.isArray(v)) return;
-              // Keep selections that don't apply this term in localStorage.
+              // Keep selections that don't apply this term in filter state.
               const preserved = reservedSeatGroups.filter(
                 (group) => !availableReservedSeatGroupSet.has(group)
               );

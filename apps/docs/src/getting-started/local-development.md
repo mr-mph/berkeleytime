@@ -157,9 +157,18 @@ for days_ago in 0 1 2; do
   fi
 done
 
-# Copy the data, restore, and seed fake user
+# Copy the data and restore catalog/enrollment collections only.
+# Exclude local auth + user-owned data (public dumps omit these; private dumps must not clobber them).
 docker cp ./prod-backup.gz berkeleytime-mongodb-1:/tmp/prod-backup.gz
-docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip --archive=/tmp/prod-backup.gz
+docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip \
+  --archive=/tmp/prod-backup.gz \
+  --nsExclude=bt.users \
+  --nsExclude=bt.schedules \
+  --nsExclude=bt.collections \
+  --nsExclude=bt.pods \
+  --nsExclude=bt.ratings \
+  --nsExclude=bt.reviews \
+  --nsExclude=bt.plans
 docker exec berkeleytime-mongodb-1 mongosh bt --eval 'const r = db.users.findOneAndUpdate({ email: "dev@berkeleytime.local" }, { $setOnInsert: { googleId: "dev-fake-public-backup", email: "dev@berkeleytime.local", name: "Dev User", staff: false, lastSeenAt: new Date() } }, { upsert: true, returnDocument: "after" }); print("Dev user id: " + r._id); print("Login URL: http://localhost:3000/api/dev/login?userId=" + r._id + "&redirect_uri=/");'
 ```
 

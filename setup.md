@@ -124,7 +124,17 @@ curl -f -o "prod-backup.gz" \
   "https://backups.berkeleytime.com/public/daily/prod_public_backup-$(TZ=America/Los_Angeles date -v -6H +%Y%m%d).gz"
 
 docker cp ./prod-backup.gz berkeleytime-mongodb-1:/tmp/prod-backup.gz
-docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip --archive=/tmp/prod-backup.gz
+# --drop only replaces collections present in the archive. Exclude local auth /
+# user-owned data so a restore (especially a private dump) cannot wipe accounts.
+docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip \
+  --archive=/tmp/prod-backup.gz \
+  --nsExclude=bt.users \
+  --nsExclude=bt.schedules \
+  --nsExclude=bt.collections \
+  --nsExclude=bt.pods \
+  --nsExclude=bt.ratings \
+  --nsExclude=bt.reviews \
+  --nsExclude=bt.plans
 ```
 
 Public backups are redacted. For fuller data, see [Fetch mongo backups](apps/docs/src/core/infrastructure/runbooks.md) (Cloudflare Access).

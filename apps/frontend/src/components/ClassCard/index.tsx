@@ -1,4 +1,4 @@
-import { ComponentPropsWithRef, Fragment, ReactNode } from "react";
+import { ComponentPropsWithRef, Fragment, ReactNode, useContext } from "react";
 
 import classNames from "classnames";
 import {
@@ -19,8 +19,10 @@ import {
   getMetricStatus,
   getStatusColor,
 } from "@/components/Class/Ratings/metricsUtil";
+import { FilterContext } from "@/components/ClassBrowser/context/FilterContext";
 import EnrollmentDisplay from "@/components/EnrollmentDisplay";
 import Units from "@/components/Units";
+import useUser from "@/hooks/useUser";
 import { IClass, IClassCourse } from "@/lib/api";
 import { IEnrollmentSingular } from "@/lib/api/enrollment";
 import { Color, Semester } from "@/lib/generated/graphql";
@@ -29,7 +31,6 @@ import {
   findBestSelectedMatch,
   formatReservedSeatsRemaining,
   getReservedSeatsRemaining,
-  getSelectedReservedSeatGroups,
 } from "@/lib/reservedSeatGroups";
 
 import styles from "./ClassCard.module.scss";
@@ -149,6 +150,8 @@ export default function ClassCard({
 }: ClassProps & Omit<ComponentPropsWithRef<"div">, keyof ClassProps>) {
   // bookmarked is part of the interface but not used in this component
   void bookmarked;
+  const { user } = useUser();
+  const filterContext = useContext(FilterContext);
   const gradeDistribution =
     _class?.course?.gradeDistribution ?? _class?.gradeDistribution;
   const formattedClassNumber = formatClassNumber(_class?.number);
@@ -158,7 +161,9 @@ export default function ClassCard({
   const maxEnroll = _class?.primarySection?.enrollment?.latest?.maxEnroll ?? 0;
   const seatReservations =
     _class?.primarySection?.enrollment?.latest?.seatReservations;
-  const selectedReservedSeatGroups = getSelectedReservedSeatGroups();
+  // Catalog filter when present; otherwise the signed-in profile.
+  const selectedReservedSeatGroups =
+    filterContext?.reservedSeatGroups ?? user?.reservedSeatGroups ?? [];
   const reservedMatch = findBestSelectedMatch(
     seatReservations,
     selectedReservedSeatGroups
@@ -332,7 +337,9 @@ export default function ClassCard({
                                 !!reservedMatch && !openReservedMatch,
                             })}
                           >
-                            <InfoCircle className={styles.reservedSeatingIcon} />
+                            <InfoCircle
+                              className={styles.reservedSeatingIcon}
+                            />
                             {openReservedMatch && reservedSeatsRemaining > 0
                               ? `${reservedSeatsRemaining.toLocaleString()} Rsvd`
                               : reservedMatch

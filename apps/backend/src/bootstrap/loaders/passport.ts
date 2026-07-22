@@ -201,63 +201,64 @@ export default async (app: Application, redis: RedisClientType) => {
   );
 
   // DEV-ONLY: Direct user login without Google OAuth
-  if (config.isDev) {
-    const DEV_LOGIN_ROUTE = "/dev/login";
-    const DEV_USERS_ROUTE = "/dev/users";
-
-    // GET /dev/login?userId=xxx&redirect_uri=/
-    app.get(DEV_LOGIN_ROUTE, async (req, res) => {
-      const { userId, redirect_uri: redirectURI } = req.query;
-
-      const parsedRedirectURI =
-        typeof redirectURI === "string" ? redirectURI : "/";
-
-      const redirectWithDevAuthError = (reason: string) => {
-        const separator = parsedRedirectURI.includes("?") ? "&" : "?";
-        return `${parsedRedirectURI}${separator}devAuthError=${encodeURIComponent(
-          reason
-        )}`;
-      };
-
-      const failDevLogin = (reason: string) => {
-        if (req.session?.cookie) {
-          req.session.cookie.maxAge = 0;
-        }
-        res.redirect(redirectWithDevAuthError(reason));
-      };
-
-      if (!userId || typeof userId !== "string") {
-        failDevLogin("invalid_user_id");
-        return;
-      }
-
-      const user = await UserModel.findById(userId);
-      if (!user) {
-        failDevLogin("user_not_found");
-        return;
-      }
-
-      const sessionUser = { _id: user._id.toString(), email: user.email };
-
-      req.login(sessionUser, (err) => {
-        if (err) {
-          failDevLogin("login_failed");
-          return;
-        }
-
-        if (req.session?.cookie) {
-          req.session.cookie.maxAge = AUTHENTICATED_SESSION_TTL;
-        }
-
-        res.redirect(parsedRedirectURI);
-      });
-    });
-
-    // GET /dev/users - List available users for selection
-    app.get(DEV_USERS_ROUTE, async (_req, res) => {
-      const users = await UserModel.find({}).select("_id email name staff");
-
-      res.json(users);
-    });
-  }
+  // Disabled for public laptop/tunnel hosting — re-enable for local-only work.
+  // if (config.isDev) {
+  //   const DEV_LOGIN_ROUTE = "/dev/login";
+  //   const DEV_USERS_ROUTE = "/dev/users";
+  //
+  //   // GET /dev/login?userId=xxx&redirect_uri=/
+  //   app.get(DEV_LOGIN_ROUTE, async (req, res) => {
+  //     const { userId, redirect_uri: redirectURI } = req.query;
+  //
+  //     const parsedRedirectURI =
+  //       typeof redirectURI === "string" ? redirectURI : "/";
+  //
+  //     const redirectWithDevAuthError = (reason: string) => {
+  //       const separator = parsedRedirectURI.includes("?") ? "&" : "?";
+  //       return `${parsedRedirectURI}${separator}devAuthError=${encodeURIComponent(
+  //         reason
+  //       )}`;
+  //     };
+  //
+  //     const failDevLogin = (reason: string) => {
+  //       if (req.session?.cookie) {
+  //         req.session.cookie.maxAge = 0;
+  //       }
+  //       res.redirect(redirectWithDevAuthError(reason));
+  //     };
+  //
+  //     if (!userId || typeof userId !== "string") {
+  //       failDevLogin("invalid_user_id");
+  //       return;
+  //     }
+  //
+  //     const user = await UserModel.findById(userId);
+  //     if (!user) {
+  //       failDevLogin("user_not_found");
+  //       return;
+  //     }
+  //
+  //     const sessionUser = { _id: user._id.toString(), email: user.email };
+  //
+  //     req.login(sessionUser, (err) => {
+  //       if (err) {
+  //         failDevLogin("login_failed");
+  //         return;
+  //       }
+  //
+  //       if (req.session?.cookie) {
+  //         req.session.cookie.maxAge = AUTHENTICATED_SESSION_TTL;
+  //       }
+  //
+  //       res.redirect(parsedRedirectURI);
+  //     });
+  //   });
+  //
+  //   // GET /dev/users - List available users for selection
+  //   app.get(DEV_USERS_ROUTE, async (_req, res) => {
+  //     const users = await UserModel.find({}).select("_id email name staff");
+  //
+  //     res.json(users);
+  //   });
+  // }
 };

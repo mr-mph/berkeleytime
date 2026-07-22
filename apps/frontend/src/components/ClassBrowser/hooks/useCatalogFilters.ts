@@ -2,7 +2,6 @@ import {
   Dispatch,
   SetStateAction,
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -21,21 +20,19 @@ import {
 import type { ICatalogFilters } from "@/lib/api/catalog";
 import type { GetCatalogSearchQueryVariables } from "@/lib/generated/graphql";
 import {
-  getSelectedReservedSeatGroups,
   readReservedSeatGroupsFromSearchParams,
-  setSelectedReservedSeatGroups,
   writeReservedSeatGroupsToSearchParams,
 } from "@/lib/reservedSeatGroups";
 
 import {
   Day,
   EnrollmentFilter,
-  enrollmentFiltersRequiringReservedGroups,
   GradingFilter,
   Level,
   SortBy,
   TimeRange,
   UnitRange,
+  enrollmentFiltersRequiringReservedGroups,
 } from "../browser";
 
 const LEGACY_ENROLLMENT_FILTER_MAP: Record<string, EnrollmentFilter> = {
@@ -212,7 +209,7 @@ export default function useCatalogFilters({
   const [localOnline, setLocalOnline] = useState<boolean>(false);
   const [localReservedSeatGroups, setLocalReservedSeatGroups] = useState<
     string[]
-  >(() => getSelectedReservedSeatGroups());
+  >([]);
   const [localScheduleConflictFilter, setLocalScheduleConflictFilter] =
     useState<string | null>(null);
 
@@ -329,9 +326,7 @@ export default function useCatalogFilters({
     if (persistent) {
       const param = searchParams.get("enrollmentFilter");
       if (!param) return null;
-      if (
-        Object.values(EnrollmentFilter).includes(param as EnrollmentFilter)
-      ) {
+      if (Object.values(EnrollmentFilter).includes(param as EnrollmentFilter)) {
         return param as EnrollmentFilter;
       }
       return LEGACY_ENROLLMENT_FILTER_MAP[param] ?? null;
@@ -351,16 +346,6 @@ export default function useCatalogFilters({
     }
     return localReservedSeatGroups;
   }, [searchParams, localReservedSeatGroups, persistent]);
-
-  // Keep localStorage identity in sync when URL is the source of truth
-  useEffect(() => {
-    if (!persistent) return;
-    const fromUrl = readReservedSeatGroupsFromSearchParams(searchParams);
-    if (fromUrl.length > 0) {
-      setSelectedReservedSeatGroups(fromUrl);
-      setLocalReservedSeatGroups(fromUrl);
-    }
-  }, [persistent, searchParams]);
 
   // Build server-side filter variables
   const filterVariables = useMemo<ICatalogFilters | undefined>(() => {
@@ -594,7 +579,6 @@ export default function useCatalogFilters({
     scheduleConflictFilter: localScheduleConflictFilter,
     updateScheduleConflictFilter: setLocalScheduleConflictFilter,
     updateReservedSeatGroups: (groups) => {
-      setSelectedReservedSeatGroups(groups);
       setLocalReservedSeatGroups(groups);
       if (persistent) {
         writeReservedSeatGroupsToSearchParams(searchParams, groups);

@@ -41,6 +41,8 @@ Public backups are meant for local development and include only a redacted subse
 - `enrollmentHistories`
 - `enrollmenttimeframes`
 
+It does **not** include `users` or other per-user data (schedules, bookmarks, ratings, etc.). Those live only in your local Mongo after people sign in.
+
 ```sh
 # Probe today/yesterday/… in PT — publish time is not reliable.
 for days_ago in 0 1 2; do
@@ -85,7 +87,16 @@ done
 Reproduced from local development:
 ```sh
 docker cp ./prod-backup.gz berkeleytime-mongodb-1:/tmp/prod-backup.gz
-docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip --archive=/tmp/prod-backup.gz
+# Exclude local auth + user-owned data so restores don't wipe accounts/schedules.
+docker exec berkeleytime-mongodb-1 mongorestore --drop --gzip \
+  --archive=/tmp/prod-backup.gz \
+  --nsExclude=bt.users \
+  --nsExclude=bt.schedules \
+  --nsExclude=bt.collections \
+  --nsExclude=bt.pods \
+  --nsExclude=bt.ratings \
+  --nsExclude=bt.reviews \
+  --nsExclude=bt.plans
 docker exec berkeleytime-mongodb-1 mongosh bt --eval 'const r = db.users.findOneAndUpdate({ email: "dev@berkeleytime.local" }, { $setOnInsert: { googleId: "dev-fake-public-backup", email: "dev@berkeleytime.local", name: "Dev User", staff: false, lastSeenAt: new Date() } }, { upsert: true, returnDocument: "after" }); print("Dev user id: " + r._id); print("Login URL: http://localhost:3000/api/dev/login?userId=" + r._id + "&redirect_uri=/");'
 ```
 

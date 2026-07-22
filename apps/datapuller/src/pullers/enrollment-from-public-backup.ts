@@ -39,10 +39,19 @@ const BACKUP_LOOKBACK_DAYS = 3;
  * scripts/data/spring-2027-draft.json after every successful merge.
  */
 const NS_EXCLUDE = [
+  // Auth + per-user app data (must survive public/private backup merges)
   "bt.users",
   "bt.schedules",
   "bt.collections",
   "bt.pods",
+  "bt.ratings",
+  "bt.reviews",
+  "bt.aggregatedmetrics",
+  "bt.plans",
+  "bt.planterms",
+  "bt.planrequirements",
+  "bt.selectedplanrequirements",
+  "bt.labels",
   "bt.banners",
   "bt.bannerviewcounts",
   "bt.classviewcounts",
@@ -65,6 +74,15 @@ const NS_EXCLUDE = [
  */
 const LOCAL_OWNED_COLLECTIONS = [
   "users",
+  "schedules",
+  "collections",
+  "pods",
+  "ratings",
+  "reviews",
+  "plans",
+  "planterms",
+  "selectedplanrequirements",
+  "labels",
   "rmp_professors",
   "articulations",
 ] as const;
@@ -538,7 +556,7 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: etag,
           lastRestoredAt: new Date(),
-          message: `Restored public backup ${dateKey} (--drop); preserved users + rmp_professors + articulations; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog enrollment + RMP`,
+          message: `Restored public backup ${dateKey} (--drop); preserved local user data + rmp_professors + articulations; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog enrollment + RMP`,
         },
       },
       { upsert: true }

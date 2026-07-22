@@ -4,11 +4,11 @@ import { HoverCard } from "radix-ui";
 
 import { Badge, Color } from "@repo/theme";
 
+import useUser from "@/hooks/useUser";
 import {
   findBestOpenMatch,
   findBestSelectedMatch,
   formatReservedSeatsRemaining,
-  getSelectedReservedSeatGroups,
 } from "@/lib/reservedSeatGroups";
 
 import styles from "./ReservedSeatingHoverCard.module.scss";
@@ -24,7 +24,7 @@ interface SeatReservation {
 
 interface ReservedSeatingHoverCardProps {
   seatReservationCount: SeatReservation[];
-  /** Override selected groups; defaults to localStorage identity. */
+  /** Override selected groups; defaults to the signed-in profile. */
   highlightedDescriptions?: string[];
 }
 
@@ -32,8 +32,9 @@ export function ReservedSeatingHoverCard({
   seatReservationCount,
   highlightedDescriptions,
 }: ReservedSeatingHoverCardProps) {
+  const { user } = useUser();
   const selected =
-    highlightedDescriptions ?? getSelectedReservedSeatGroups();
+    highlightedDescriptions ?? user?.reservedSeatGroups ?? [];
   const selectedSet = new Set(selected);
 
   const validReservations = seatReservationCount
