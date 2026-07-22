@@ -499,7 +499,10 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
     etag &&
     status.lastEtag === etag
   ) {
-    log.info(`Already merged backup ${dateKey} (etag match); skipping`);
+    log.info(`Already merged backup ${dateKey} (etag match); skipping restore`);
+    // Still ensure draft Sp2027 exists — a prior merge may have dropped it
+    // before reseed was wired, or a manual wipe cleared it.
+    await reseedDraftSchedule(config.mongoDB.uri, log);
     return;
   }
 
@@ -508,6 +511,7 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
     log.info(
       `Newest available backup ${dateKey} is older than last merged ${status.lastBackupDate}; skipping`
     );
+    await reseedDraftSchedule(config.mongoDB.uri, log);
     return;
   }
 

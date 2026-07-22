@@ -23,6 +23,20 @@ run_puller() {
 
 echo "Datapuller dev scheduler started."
 
+# Seed Spring 2027 draft schedule on every container start (idempotent).
+# Public backup merges --drop shared catalog collections, so compose-up and
+# post-merge reseed are both required for draft offerings to stick locally.
+seed_draft_schedule() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Seeding Spring 2027 draft schedule..."
+  if npx tsx /datapuller/scripts/import-draft-schedule.ts; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Spring 2027 draft schedule ready"
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: Spring 2027 draft seed failed (will retry after backup merge)"
+  fi
+}
+
+seed_draft_schedule
+
 # Enrollment: SIS Classes API (disabled locally — requires real SIS_CLASS_APP_* keys).
 # (
 #   while true; do
