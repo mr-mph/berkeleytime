@@ -1,3 +1,4 @@
+import { WarningTriangleSolid } from "iconoir-react";
 import { Link } from "react-router-dom";
 
 import styles from "./Dorms.module.scss";
@@ -30,8 +31,14 @@ const ROOMS = [
 export default function Dorms() {
   return (
     <div className={styles.root}>
+      <div className={styles.experimentalBanner} role="note">
+        <WarningTriangleSolid className={styles.bannerIcon} aria-hidden />
+        <span>
+          Dorms is still experimental — expect bugs and rough edges while we
+          build it out.
+        </span>
+      </div>
       <section className={styles.hero}>
-        <p className={styles.eyebrow}>Dorms</p>
         <h1>Explore Berkeley dorm rooms in 3D</h1>
         <p className={styles.description}>
           Walk through measured 3D reconstructions of real dorm rooms, arrange
