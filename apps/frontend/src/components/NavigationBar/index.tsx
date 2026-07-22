@@ -158,6 +158,7 @@ export default function NavigationBar({
                 { to: "/gradtrak", label: "Gradtrak" },
                 { to: gradesPath, label: "Grades" },
                 { to: enrollmentPath, label: "Enrollment" },
+                { to: "/dorms", label: "Dorms" },
               ].map(({ to, label }) => (
                 <motion.div
                   key={to}
@@ -221,6 +222,13 @@ export default function NavigationBar({
             {({ isActive }) => (
               <MenuItem className={styles.item} active={isActive}>
                 Enrollment
+              </MenuItem>
+            )}
+          </NavLink>
+          <NavLink to="/dorms">
+            {({ isActive }) => (
+              <MenuItem className={styles.item} active={isActive}>
+                Dorms
               </MenuItem>
             )}
           </NavLink>
