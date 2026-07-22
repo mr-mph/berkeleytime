@@ -38,6 +38,8 @@ const LegacyGradeDistributions = lazy(
   () => import("@/app/_legacy/GradeDistributions")
 );
 const About = lazy(() => import("@/app/About"));
+const Dorms = lazy(() => import("@/app/Dorms"));
+const DormRoom = lazy(() => import("@/app/Dorms/RoomViewer"));
 // const Discover = lazy(() => import("@/app/Discover"));
 const CuratedClasses = lazy(() => import("@/app/CuratedClasses"));
 const Privacy = lazy(() => import("@/app/Legal/Privacy"));
@@ -162,6 +164,14 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: "dorms",
+            element: (
+              <SuspenseBoundary key="dorms">
+                <Dorms />
+              </SuspenseBoundary>
+            ),
+          },
+          {
             path: "about",
             element: (
               <SuspenseBoundary key="about">
@@ -190,6 +200,14 @@ const router = createBrowserRouter([
       {
         element: <Layout footer={false} scrollLock />,
         children: [
+          {
+            path: "dorms/:roomId",
+            element: (
+              <SuspenseBoundary key="dorm-room">
+                <DormRoom />
+              </SuspenseBoundary>
+            ),
+          },
           {
             element: (
               <SuspenseBoundary key="profile">
