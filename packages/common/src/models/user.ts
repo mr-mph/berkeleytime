@@ -66,6 +66,17 @@ export const userSchema = new Schema(
       required: false,
       default: [],
     },
+    /**
+     * True once this person has authenticated on the EECSTime deployment.
+     * Berkeleytime backup merges must not overwrite these users (or their
+     * schedules / GradTrak / ratings / reviews).
+     */
+    eecsTimeUser: {
+      type: Boolean,
+      required: true,
+      default: false,
+      index: true,
+    },
     lastSeenAt: {
       type: Date,
       required: true,

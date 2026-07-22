@@ -182,8 +182,9 @@ seed_database() {
   [[ -n "$mongo_container_id" ]] || die "MongoDB container not found. Is Docker Compose running?"
 
   docker cp "./$backup_file" "${mongo_container_id}:/tmp/prod-backup.gz"
-  # Preserve local auth + user-owned data across restore.
-  # Public dumps omit these; private dumps must not clobber a hosted local DB.
+  # Preserve local auth identity. Public dumps include GradTrak/ratings/reviews
+  # (migrate those); users/schedules are omitted from the public dump and must
+  # not be clobbered if a dump ever includes them.
   # Keep in sync with NS_EXCLUDE in enrollment-from-public-backup.ts.
   docker exec "$mongo_container_id" mongorestore --drop --gzip \
     --archive=/tmp/prod-backup.gz \
@@ -191,14 +192,7 @@ seed_database() {
     --nsExclude=bt.schedules \
     --nsExclude=bt.collections \
     --nsExclude=bt.pods \
-    --nsExclude=bt.ratings \
-    --nsExclude=bt.reviews \
     --nsExclude=bt.aggregatedmetrics \
-    --nsExclude=bt.plans \
-    --nsExclude=bt.planterms \
-    --nsExclude=bt.planrequirements \
-    --nsExclude=bt.selectedplanrequirements \
-    --nsExclude=bt.labels \
     --nsExclude=bt.rmp_professors \
     --nsExclude=bt.articulations
   docker cp "./docker/mongodb/init/02-seed-dev-users.js" "${mongo_container_id}:/tmp/02-seed-dev-users.js"
@@ -221,7 +215,7 @@ seed_database() {
     warn "Datapuller container not running; skipped draft reseed + catalog enrollment sync."
   fi
 
-  log "MongoDB restore complete (users + schedules/bookmarks/ratings preserved; Spring 2027 draft reseeded when possible)."
+  log "MongoDB restore complete (users/schedules preserved; GradTrak/ratings/reviews from public backup; Spring 2027 draft reseeded when possible)."
 }
 
 parse_args() {

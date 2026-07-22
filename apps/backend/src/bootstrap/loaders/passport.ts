@@ -187,10 +187,12 @@ export default async (app: Application, redis: RedisClientType) => {
             googleId: profile.id,
             name: profile.displayName,
             lastSeenAt: new Date(),
+            eecsTimeUser: true,
           });
         } else {
           user.name = profile.displayName;
           user.lastSeenAt = new Date();
+          user.eecsTimeUser = true;
         }
 
         const doc = await user.save();
@@ -236,6 +238,11 @@ export default async (app: Application, redis: RedisClientType) => {
         failDevLogin("user_not_found");
         return;
       }
+
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { eecsTimeUser: true, lastSeenAt: new Date() } }
+      );
 
       const sessionUser = { _id: user._id.toString(), email: user.email };
 

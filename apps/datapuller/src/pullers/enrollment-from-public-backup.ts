@@ -12,6 +12,10 @@ import {
   syncCatalogEnrollmentForAllCatalogTerms,
   updateCatalogRmpRatings,
 } from "../lib/catalog-denormalize";
+import {
+  reapplyEecsTimeProtectedData,
+  snapshotEecsTimeProtectedData,
+} from "../lib/eecsTimeUserBackup";
 import { syncCrosslistingEnrollmentFanout } from "./crosslisting-enrollment-fanout";
 
 const PUBLIC_BACKUP_BASE =
@@ -25,33 +29,26 @@ const PUBLIC_BACKUP_BASE =
 const BACKUP_LOOKBACK_DAYS = 3;
 
 /**
- * Never touch local user / private state, even if a future public dump includes them.
- * Restore uses --drop on collections present in the archive (excluded / absent
- * collections are left alone). Local-owned collections are snapshotted first
- * and put back afterward.
- *
- * Also never overwrite locally-owned enrichment datasets that we pull ourselves:
+ * Never touch enrichment datasets we pull ourselves:
  * - rmp_professors: Rate My Professors cache
  * - articulations: ASSIST.org CCC→Berkeley articulations
+ *
+ * Public dumps include GradTrak (`plans`), ratings, and reviews (keyed by
+ * email / createdBy). Users who have logged into EECSTime (`eecsTimeUser`)
+ * are snapshotted and re-applied after restore so their local rows win;
+ * everyone else gets the Berkeleytime backup copy.
+ *
+ * `users` / `schedules` / `collections` are not in the public dump today;
+ * we still nsExclude them so a future dump cannot clobber EECSTime logins
+ * without going through the protection path (snapshot only covers
+ * `eecsTimeUser: true` rows).
  *
  * Spring 2027 draft schedule is NOT excluded here (it lives in shared
  * classes/sections/terms/catalog_classes). Instead we re-seed it from
  * scripts/data/spring-2027-draft.json after every successful merge.
  */
 const NS_EXCLUDE = [
-  // Auth + per-user app data (must survive public/private backup merges)
-  "bt.users",
-  "bt.schedules",
-  "bt.collections",
-  "bt.pods",
-  "bt.ratings",
-  "bt.reviews",
-  "bt.aggregatedmetrics",
-  "bt.plans",
-  "bt.planterms",
-  "bt.planrequirements",
-  "bt.selectedplanrequirements",
-  "bt.labels",
+  // Ops / analytics — keep local
   "bt.banners",
   "bt.bannerviewcounts",
   "bt.classviewcounts",
@@ -59,33 +56,24 @@ const NS_EXCLUDE = [
   "bt.semester-roles",
   "bt.staff-members",
   "bt.targetedmessages",
-  // Locally owned — not taken from berkeleytime.com backups
+  "bt.aggregatedmetrics",
+  // Locally owned enrichment
   "bt.rmp_professors",
   "bt.articulations",
   // Local job bookkeeping
   "bt.enrollment_backup_sync_statuses",
   "bt.ucb_enrollment_scrape_statuses",
+  // Auth / schedule identity — not migrated from public dump; protect local
+  "bt.users",
+  "bt.schedules",
+  "bt.collections",
+  "bt.pods",
 ] as const;
 
 /**
- * Collections we snapshot before restore and always put back afterward.
- * Belt-and-suspenders with NS_EXCLUDE — even if exclude/filtering fails, these
- * local collections are restored from the pre-merge snapshot.
+ * Always snapshot/restore these after any --drop restore (not user-migrated).
  */
-const LOCAL_OWNED_COLLECTIONS = [
-  "users",
-  "schedules",
-  "collections",
-  "pods",
-  "ratings",
-  "reviews",
-  "plans",
-  "planterms",
-  "selectedplanrequirements",
-  "labels",
-  "rmp_professors",
-  "articulations",
-] as const;
+const LOCAL_OWNED_COLLECTIONS = ["rmp_professors", "articulations"] as const;
 
 /** Idempotent draft importer mounted into the datapuller container. */
 const DRAFT_SCHEDULE_IMPORT_SCRIPT =
@@ -424,6 +412,7 @@ const downloadBackup = async (
  * - --drop: drop each restored collection first (no E11000 spam; full refresh).
  * - Collections not in the archive / nsExclude'd are untouched.
  * - Local-owned collections are snapshotted and restored around this call.
+ * - EECSTime-protected user data is snapshotted/re-applied around this call.
  */
 const mergePublicBackup = async (
   archivePath: string,
@@ -522,6 +511,14 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
   const snapshotDir = path.join("/tmp", `bt-local-owned-${runId}`);
   try {
     await runCommand("mkdir", ["-p", snapshotDir], log);
+
+    // Snapshot EECSTime logins before restore can replace GradTrak / reviews.
+    const eecsProtection = await snapshotEecsTimeProtectedData(
+      config.mongoDB.uri,
+      snapshotDir,
+      log
+    );
+
     const localSnapshots = await snapshotLocalOwnedCollections(
       config.mongoDB.uri,
       snapshotDir,
@@ -531,7 +528,14 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
     await downloadBackup(url, archivePath, log);
     await mergePublicBackup(archivePath, config.mongoDB.uri, log);
 
-    // Guarantee users + RMP + ASSIST survive even if exclude/filtering fails.
+    // Re-apply EECSTime users + their schedules / GradTrak / reviews.
+    await reapplyEecsTimeProtectedData(
+      config.mongoDB.uri,
+      eecsProtection,
+      log
+    );
+
+    // Guarantee RMP + ASSIST survive even if exclude/filtering fails.
     await restoreLocalOwnedSnapshots(
       config.mongoDB.uri,
       localSnapshots,
@@ -560,7 +564,7 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: etag,
           lastRestoredAt: new Date(),
-          message: `Restored public backup ${dateKey} (--drop); preserved local user data + rmp_professors + articulations; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog enrollment + RMP`,
+          message: `Restored public backup ${dateKey} (--drop); protected ${eecsProtection.userIds.length} EECSTime user(s); migrated GradTrak/ratings/reviews for non-EECSTime users; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog enrollment + RMP`,
         },
       },
       { upsert: true }
