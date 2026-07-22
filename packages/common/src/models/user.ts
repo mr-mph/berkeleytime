@@ -66,6 +66,13 @@ export const userSchema = new Schema(
       required: false,
       default: [],
     },
+    dormRoomLayouts: {
+      type: Map,
+      of: String,
+      required: true,
+      default: {},
+      select: false,
+    },
     /**
      * True once this person has authenticated on the EECSTime deployment.
      * Berkeleytime backup merges must not overwrite these users (or their

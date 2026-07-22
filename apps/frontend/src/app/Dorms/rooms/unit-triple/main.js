@@ -37,7 +37,7 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){ .dorm-room-host *{ transition:none !important; } }
 `;
 
-export function createUnitTripleRoom({ container }) {
+export function createUnitTripleRoom({ container, initialLayout = null, onLayoutChange = () => {} }) {
   const Q = new URLSearchParams(location.search);
   const STILL = Q.get('still') === '1';
 
@@ -369,6 +369,8 @@ export function createUnitTripleRoom({ container }) {
     ],
     onInteractionStart:()=>{walk.dragging=false;orbit.enabled=false},
     onInteractionEnd:()=>{walk.dragging=false;orbit.enabled=state.mode==='orbit'},
+    initialLayout,
+    onLayoutChange,
   });
   $('bResetLayout').onclick=()=>planner.clearLayout();
   panel.querySelectorAll('[data-mode]').forEach(button=>{button.onclick=()=>setMode(button.dataset.mode)});$('settingsToggle').onclick=()=>{const open=panel.classList.toggle('open');$('settingsToggle').classList.toggle('on',open)};

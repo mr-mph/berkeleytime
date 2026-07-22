@@ -1,4 +1,10 @@
-import { deleteAccount, getUser, updateUser } from "./controller";
+import {
+  deleteAccount,
+  getDormRoomLayout,
+  getUser,
+  saveDormRoomLayout,
+  updateUser,
+} from "./controller";
 import { UserModule } from "./generated-types/module-types";
 
 const resolvers: UserModule.Resolvers = {
@@ -8,6 +14,9 @@ const resolvers: UserModule.Resolvers = {
 
       return user as unknown as UserModule.User;
     },
+    dormRoomLayout: async (_, { roomId }, context) => {
+      return await getDormRoomLayout(context, roomId);
+    },
   },
 
   Mutation: {
@@ -15,6 +24,9 @@ const resolvers: UserModule.Resolvers = {
       const user = await updateUser(context, input);
 
       return user as unknown as UserModule.User;
+    },
+    saveDormRoomLayout: async (_, { roomId, layout }, context) => {
+      return await saveDormRoomLayout(context, roomId, layout);
     },
     deleteAccount: async (_, __, context) => {
       return await deleteAccount(context);

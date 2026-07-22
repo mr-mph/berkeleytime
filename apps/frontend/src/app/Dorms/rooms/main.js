@@ -42,7 +42,7 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){ .dorm-room-host *{ transition:none !important; } }
 `;
 
-export function createBlackwellRoom({ container }) {
+export function createBlackwellRoom({ container, initialLayout = null, onLayoutChange = () => {} }) {
   const Q = new URLSearchParams(location.search);
   const STILL = Q.get('still') === '1';
 
@@ -366,6 +366,8 @@ export function createBlackwellRoom({ container }) {
     ],
     onInteractionStart: () => { walk.dragging = false; orbit.enabled = false; },
     onInteractionEnd: () => { walk.dragging = false; orbit.enabled = state.mode === 'orbit'; },
+    initialLayout,
+    onLayoutChange,
   });
   $('bResetLayout').onclick = () => planner.clearLayout();
   panel.querySelectorAll('[data-mode]').forEach(button => {

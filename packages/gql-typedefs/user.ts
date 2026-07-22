@@ -8,6 +8,12 @@ export const userTypeDef = gql`
     GRADUATE
   }
 
+  enum DormRoomId {
+    BLACKWELL
+    UNIT_TRIPLE
+    UNIT_DOUBLE
+  }
+
   type User @cacheControl(scope: PRIVATE) {
     _id: ID!
     email: String!
@@ -43,6 +49,7 @@ export const userTypeDef = gql`
 
   type Query {
     user: User @auth
+    dormRoomLayout(roomId: DormRoomId!): String @auth
   }
 
   input UpdateUserInput {
@@ -66,6 +73,7 @@ export const userTypeDef = gql`
 
   type Mutation {
     updateUser(user: UpdateUserInput!): User @auth
+    saveDormRoomLayout(roomId: DormRoomId!, layout: String): String @auth
     deleteAccount: Boolean @auth
   }
 `;

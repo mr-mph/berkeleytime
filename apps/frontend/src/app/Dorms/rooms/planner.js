@@ -229,6 +229,7 @@ export function createPlanner({
   THREE, root, camera, renderer, orbit, room, setPlanView, container,
   builtins = [], fixedColliders = FIXED_COLLIDERS,
   onInteractionStart = () => {}, onInteractionEnd = () => {},
+  initialLayout = null, onLayoutChange = () => {},
 }) {
   const style=document.createElement('style');style.textContent=PLANNER_CSS;document.head.appendChild(style);
   const shell=document.createElement('div');
@@ -368,10 +369,10 @@ export function createPlanner({
   function layoutPayload(){return{v:4,i:items.filter(i=>i.catalogId||builtinChanged(i)).map(i=>[i.builtin?`@${i.builtinId}`:i.catalogId,Math.round(i.x*1000),Math.round(i.y*1000),Math.round(i.z*1000),Math.round((((THREE.MathUtils.radToDeg(i.rotation)%360)+360)%360)*10),i.sizeIndex,wallCodes[i.wall]||0,Math.round(i.dimensions.w*1000),Math.round(i.dimensions.h*1000),Math.round(i.dimensions.d*1000),i.interactionLayer||0])}}
   function encodeLayout(value){const bytes=new TextEncoder().encode(JSON.stringify(value));let binary='';bytes.forEach(b=>binary+=String.fromCharCode(b));return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
   function decodeLayout(value){const binary=atob(value.replace(/-/g,'+').replace(/_/g,'/'));return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0))))}
-  function saveUrl(){const url=new URL(location.href),payload=layoutPayload();if(payload.i.length)url.searchParams.set('layout',encodeLayout(payload));else url.searchParams.delete('layout');history.replaceState(history.state,'',url)}
-  function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveUrl,80)}
-  function loadUrl(){
-    const raw=new URLSearchParams(location.search).get('layout');if(!raw)return;
+  function saveLayout(){const url=new URL(location.href),payload=layoutPayload(),encoded=payload.i.length?encodeLayout(payload):null;if(encoded)url.searchParams.set('layout',encoded);else url.searchParams.delete('layout');history.replaceState(history.state,'',url);try{onLayoutChange(encoded)}catch(e){console.warn('Unable to persist room layout',e)}}
+  function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=0;saveLayout()},80)}
+  function loadLayout(raw){
+    if(!raw)return;
     // Shared links are untrusted: finite-guard coordinates (fall back to room center)
     // and clamp dimensions to the room, so a crafted layout can't wedge the scene with
     // NaN/Infinity or blow it up with astronomical values.
@@ -387,7 +388,7 @@ export function createPlanner({
       if(data.v===3){for(const [id,x,y,z,r,si,wc,w,h,d] of data.i.slice(0,180)){const rotation=THREE.MathUtils.degToRad((r||0)/10),dimensions=dims(w,h,d);if(String(id).startsWith('@')){const item=items.find(i=>i.builtinId===String(id).slice(1));if(item){item.x=cx(x);item.y=cy(y);item.z=cz(z);item.rotation=rotation;applyTransform(item)}}else{const spec=catalogItemSpec(id,si||0);if(spec)createInstance(spec,{x:cx(x),y:cy(y),z:cz(z),rotation,sizeIndex:si||0,dimensions,wall:codeWalls[wc]||null})}}}
       if(data.v===4){for(const [id,x,y,z,r,si,wc,w,h,d,layer] of data.i.slice(0,180)){const rotation=THREE.MathUtils.degToRad((r||0)/10),dimensions=dims(w,h,d);if(String(id).startsWith('@')){const item=items.find(i=>i.builtinId===String(id).slice(1));if(item){item.x=cx(x);item.y=cy(y);item.z=cz(z);item.rotation=rotation;item.interactionLayer=Number.isFinite(layer)?layer:0;applyTransform(item)}}else{const spec=catalogItemSpec(id,si||0);if(spec)createInstance(spec,{x:cx(x),y:cy(y),z:cz(z),rotation,sizeIndex:si||0,dimensions,wall:codeWalls[wc]||null,interactionLayer:Number.isFinite(layer)?layer:0})}}}
       select(null);
-    }catch(e){console.warn('Invalid shared layout',e)}
+    }catch(e){console.warn('Invalid room layout',e)}
   }
 
   function toast(text){const t=$('plannerToast');t.textContent=text;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1800)}
@@ -421,7 +422,7 @@ export function createPlanner({
   $('plSearch').oninput=e=>{query=e.target.value;renderCatalog()};$('plPlan').onclick=()=>setPlanView?.();
   $('plCatPrev').onclick=()=>$('plCats').scrollBy({left:-260,behavior:'smooth'});$('plCatNext').onclick=()=>$('plCats').scrollBy({left:260,behavior:'smooth'});
   $('plClear').onclick=()=>clearLayout();
-  $('plShare').onclick=async()=>{saveUrl();const generated=items.some(i=>i.spec.generated);try{await navigator.clipboard.writeText(location.href);toast(generated?'Link copied; export generated items separately':'Link copied')}catch{prompt('Copy layout link',location.href)}};
+  $('plShare').onclick=async()=>{saveLayout();const generated=items.some(i=>i.spec.generated);try{await navigator.clipboard.writeText(location.href);toast(generated?'Link copied; export generated items separately':'Link copied')}catch{prompt('Copy layout link',location.href)}};
   $('plRotation').oninput=e=>{if(!selected||selected.mount==='wall')return;selected.rotation=THREE.MathUtils.degToRad(+e.target.value);clampInstance(selected);refreshSelection();scheduleSave()};
   $('plElevation').oninput=e=>{if(!selected)return;selected.y=+e.target.value*IN;clampInstance(selected);refreshSelection();scheduleSave()};
   for(const [axis,id] of [['w','plDimW'],['d','plDimD'],['h','plDimH']]){const input=$(id);input.onchange=()=>changeDimension(axis,input.value);input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();changeDimension(axis,input.value);input.blur()}}}
@@ -484,14 +485,14 @@ export function createPlanner({
   function updateOverlay(){if(!selected){$('measureTag').style.display='none';return}const p=new THREE.Vector3(selected.x,selected.y+selected.dimensions.h+.16,selected.z);root.localToWorld(p);p.project(camera);const rect=renderer.domElement.getBoundingClientRect(),hostRect=container.getBoundingClientRect(),visible=p.z<1&&p.x>-1.2&&p.x<1.2&&p.y>-1.2&&p.y<1.2;$('measureTag').style.display=visible?'block':'none';$('measureTag').style.left=`${rect.left-hostRect.left+(p.x*.5+.5)*rect.width}px`;$('measureTag').style.top=`${rect.top-hostRect.top+(-p.y*.5+.5)*rect.height}px`;$('measureTag').textContent=`${fmtIn(selected.dimensions.w)} × ${fmtIn(selected.dimensions.d)} × ${fmtIn(selected.dimensions.h)}${selected.y>0?` · ${fmtIn(selected.y)} up`:''}`}
   function drawMinimap(ctx,ox,oy,scale){for(const item of items){if(item.mount==='wall')continue;const b=bounds(item),fit=fitFor(item);ctx.fillStyle=fit.ok?'rgba(34,197,94,.58)':'rgba(239,68,68,.68)';ctx.fillRect(ox+b.x0*scale,oy+b.z0*scale,(b.x1-b.x0)*scale,(b.z1-b.z0)*scale)}}
   function getColliders(){return items.filter(i=>i.mount!=='wall'&&i.spec.category!=='Floor'&&i.dimensions.h>=.04&&i.y<1.8&&i.y+i.dimensions.h>.08).map(i=>{const b=bounds(i);return[b.x0,b.z0,b.x1,b.z1,i.y+i.dimensions.h]})}
-  function clearLayout(){for(const item of [...items])item.builtin?resetBuiltin(item):remove(item);select(null);saveUrl();toast('Layout reset')}
+  function clearLayout(){for(const item of [...items])item.builtin?resetBuiltin(item):remove(item);select(null);clearTimeout(saveTimer);saveTimer=0;saveLayout();toast('Layout reset')}
 
-  for(const def of builtins)registerBuiltin(def);renderCatalog();loadUrl();
+  for(const def of builtins)registerBuiltin(def);renderCatalog();loadLayout(new URLSearchParams(location.search).get('layout')||initialLayout);clearTimeout(saveTimer);saveTimer=0;
   function dispose(){
     plDisposed=true;modelRequestId++;
     removeEventListener('keydown',onKeyDown);
     renderer.domElement.removeEventListener('pointerdown',pointerDown,true);renderer.domElement.removeEventListener('pointermove',pointerMove,true);renderer.domElement.removeEventListener('pointerup',pointerUp,true);renderer.domElement.removeEventListener('pointercancel',pointerUp,true);
-    clearTimeout(saveTimer);clearTimeout(keyDebounce);clearTimeout(toast.timer);
+    if(saveTimer){clearTimeout(saveTimer);saveTimer=0;saveLayout()}clearTimeout(keyDebounce);clearTimeout(toast.timer);
     container.classList.remove('planner-open');
     shell.remove();style.remove();
   }

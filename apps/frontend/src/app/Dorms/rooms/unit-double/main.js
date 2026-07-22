@@ -32,7 +32,7 @@ const CSS=`
 @media(prefers-reduced-motion:reduce){.dorm-room-host *{transition:none!important}}
 `;
 
-export function createUnitDoubleRoom({ container }) {
+export function createUnitDoubleRoom({ container, initialLayout = null, onLayoutChange = () => {} }) {
 const Q=new URLSearchParams(location.search), STILL=Q.get('still')==='1';
 
 container.classList.add('dorm-room-host');
@@ -113,7 +113,7 @@ planner=createPlanner({THREE,root,camera,renderer,orbit,room:ROOM,container,fixe
   {id:'chair-left',name:'Left chair',object:chairLeftG,y:0,dimensions:{w:CHAIR.baseR*2,h:CHAIR.seatH+CHAIR.backH,d:CHAIR.baseR*2}},
   {id:'chair-right',name:'Right chair',object:chairRightG,y:0,dimensions:{w:CHAIR.baseR*2,h:CHAIR.seatH+CHAIR.backH,d:CHAIR.baseR*2}},
   {id:'microchill',name:'MicroChill',object:microchillG,y:LAYOUT.microchill.y,dimensions:{w:FRIDGE.w,h:FRIDGE.h+MICROWAVE.h,d:FRIDGE.d}},
-],onInteractionStart:()=>{walk.dragging=false;orbit.enabled=false},onInteractionEnd:()=>{walk.dragging=false;orbit.enabled=state.mode==='orbit'}});
+],onInteractionStart:()=>{walk.dragging=false;orbit.enabled=false},onInteractionEnd:()=>{walk.dragging=false;orbit.enabled=state.mode==='orbit'},initialLayout,onLayoutChange});
 $('bResetLayout').onclick=()=>planner.clearLayout();panel.querySelectorAll('[data-mode]').forEach(button=>{button.onclick=()=>setMode(button.dataset.mode)});$('settingsToggle').onclick=()=>{const open=panel.classList.toggle('open');$('settingsToggle').classList.toggle('on',open)};setMode(state.mode);
 
 const clock=new THREE.Clock();applyNight(tw.night);apis.door?.setOpen?.(tw.door);apis.window?.setShade?.(tw.shade);let disposed=false,rafId=0,splashDone=false,splashTimer=0;
