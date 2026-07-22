@@ -6,6 +6,7 @@
 - filter by more than one requirement at once
 - sort by and see ratemyprofessor rating avg of each course
 - filter by if there are seats reserved for your major/year
+- filter by open seats for you specifically (non-reserved or reserved for you)
 - sort by A/A+ percent or # of ratings
 - search spring 2027 eecs listings
 
@@ -28,6 +29,10 @@
 ### grades:
 
 - allow seeing # of grades for each bar rather than just percent
+
+### profile:
+
+- fill out your year/college/major to see what reserved seats groups you qualify for and save them to your profile
 
 ### bug fixes:
 
