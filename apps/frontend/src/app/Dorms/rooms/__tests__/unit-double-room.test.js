@@ -47,6 +47,10 @@ describe('unit double entry shelf and closets', () => {
 });
 
 describe('unit double desks and chairs', () => {
+  it('uses the measured 41-inch standalone desk width', () => {
+    expect(DESK.w).toBeCloseTo(41 * 0.0254, 10);
+  });
+
   it('shares the center line between the desks', () => {
     expect(LAYOUT.deskLeft.x).toBe(LAYOUT.deskRight.x);
   });

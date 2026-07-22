@@ -83,6 +83,10 @@ describe('unit triple freestanding dresser and MicroChill', () => {
 
 // Desk backs touch z=0 after their PI rotation; chair fronts point -z toward
 // those desks and both chairs sit on their corresponding centerlines.
+it('uses the measured 41-inch standalone desk width', () => {
+  expect(DESK.w).toBeCloseTo(41 * 0.0254, 10);
+});
+
 describe.each([
   ['A', LAYOUT.deskA, LAYOUT.chairA],
   ['B', LAYOUT.deskB, LAYOUT.chairB],

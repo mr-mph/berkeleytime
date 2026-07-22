@@ -50,7 +50,7 @@ export const CLOSET = {
 // Full-height built-in between the entry door and right closet. Its narrow
 // side fills the wall bay while its shelves open sideways toward the door.
 export const BOOKCASE = { w:CLOSET.depth, d:CLOSET.right.x0-(DOOR.x0+DOOR.w), h:CLOSET.h, shelves:4 };
-export const DESK = { w:1.07, d:0.61, topT:0.035, h:0.75, pedW:0.40, kneeH:0.62, modestyT:0.018 };
+export const DESK = { w:1.0414, d:0.61, topT:0.035, h:0.75, pedW:0.40, kneeH:0.62, modestyT:0.018 }; // 41 in wide
 export const CHAIR = { seatH:0.46, seatW:0.47, seatD:0.45, backH:0.52, baseR:0.30 };
 export const FRIDGE = { w:0.48, d:0.50, h:0.87 };
 export const MICROWAVE = { w:0.48, d:0.38, h:0.28 };

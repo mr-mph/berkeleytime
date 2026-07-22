@@ -148,7 +148,7 @@ export const CLOSET = {                     // one run of TWO open bays on the
 export const DRESSER = { w: 0.62, d: 0.52, h: 0.72, drawers: 4 };
 
 export const DESK = {
-  w: 1.07, d: 0.61, topT: 0.035, h: 0.75,   // maple, right 3-drawer pedestal
+  w: 1.0414, d: 0.61, topT: 0.035, h: 0.75, // 41 in wide; maple, right 3-drawer pedestal
   pedW: 0.40, kneeH: 0.62, modestyT: 0.018,
 };
 
