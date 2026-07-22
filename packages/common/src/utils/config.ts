@@ -41,6 +41,11 @@ const env = (name: string): string => {
 
 const envOptional = (name: string): string | undefined => process.env[name];
 
+const envFlag = (name: string): boolean => {
+  const value = (envOptional(name) ?? "").trim().toLowerCase();
+  return value === "true" || value === "1" || value === "yes";
+};
+
 export interface Config {
   port: number;
   cacheWarmingPort: number;
@@ -72,6 +77,11 @@ export interface Config {
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  /**
+   * When true, disables /api/dev/* login routes (and the frontend banner should
+   * stay off). Use for public tunnel hosting. Accepts true/True/1/yes.
+   */
+  disableDevAuth: boolean;
   redisUri: string;
   s3: {
     imagesAccessUrl: string;
@@ -108,6 +118,7 @@ export const config: Config = {
   SESSION_SECRET: env("SESSION_SECRET"),
   GOOGLE_CLIENT_ID: env("GOOGLE_CLIENT_ID"),
   GOOGLE_CLIENT_SECRET: env("GOOGLE_CLIENT_SECRET"),
+  disableDevAuth: envFlag("DISABLE_DEV_AUTH"),
   redisUri: env("REDIS_URI"),
   s3: {
     imagesAccessUrl: env("S3_IMAGES_ACCESS_URL"),

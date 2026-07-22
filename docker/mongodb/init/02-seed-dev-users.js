@@ -1,25 +1,13 @@
-// Seed local-only accounts for the DevAuthBanner user switcher.
+// Seed the default local Oski account for DevAuthBanner auto-login.
 // Idempotent: upserts by email so re-runs / post-restore seeding keep existing _ids.
 
 const now = new Date();
 
 const seedUsers = [
   {
-    googleId: "dev-1",
-    email: "dev@berkeleytime.local",
-    name: "Dev",
-    staff: false,
-  },
-  {
     googleId: "dev-2",
     email: "oski@berkeleytime.local",
     name: "Oski",
-    staff: false,
-  },
-  {
-    googleId: "dev-3",
-    email: "fred@berkeley.edu",
-    name: "Fred",
     staff: false,
   },
 ];

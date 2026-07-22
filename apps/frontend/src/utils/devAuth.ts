@@ -22,6 +22,18 @@ export interface DevUser {
   staff: boolean;
 }
 
+/**
+ * Frontend gate for the yellow DevAuthBanner / auto-login.
+ * Must stay in sync with backend DISABLE_DEV_AUTH (set VITE_DISABLE_DEV_AUTH too).
+ */
+export const isDevAuthUiEnabled = (): boolean => {
+  if (!import.meta.env.DEV) return false;
+  const disabled = String(
+    import.meta.env.VITE_DISABLE_DEV_AUTH ?? ""
+  ).toLowerCase();
+  return disabled !== "true" && disabled !== "1" && disabled !== "yes";
+};
+
 // Helper functions
 export const getStoredDevUserId = (): string | null => {
   return localStorage.getItem(DEV_AUTH_USER_ID_KEY);

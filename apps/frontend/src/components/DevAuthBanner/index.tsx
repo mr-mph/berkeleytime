@@ -13,6 +13,7 @@ import {
   clearStoredDevUserId,
   getStoredDevUserId,
   isDevAuthCollapsed,
+  isDevAuthUiEnabled,
   setDevAuthCollapsed,
   setStoredDevUserId,
 } from "@/utils/devAuth";
@@ -27,13 +28,24 @@ export default function DevAuthBanner() {
   const [collapsed, setCollapsed] = useState(() => isDevAuthCollapsed());
 
   useEffect(() => {
+    if (!isDevAuthUiEnabled()) {
+      setLoading(false);
+      return;
+    }
+
     fetch(DEV_AUTH_USERS_ROUTE)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("dev auth disabled");
+        return res.json();
+      })
       .then((users) => {
         setDevUsers(users);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setDevUsers([]);
+        setLoading(false);
+      });
   }, []);
 
   const selectUser = (userId: string) => {
@@ -116,6 +128,11 @@ export default function DevAuthBanner() {
         <div className={styles.spacer} />
       </>
     );
+  }
+
+  // Backend DISABLE_DEV_AUTH (or missing seed users) — hide the banner.
+  if (devUsers.length === 0 && !user) {
+    return null;
   }
 
   return (

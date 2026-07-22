@@ -4,6 +4,7 @@ import { LogOut, Trash } from "iconoir-react";
 
 import { Button } from "@repo/theme";
 
+import { useDeleteAccount } from "@/hooks/api/users";
 import useUser from "@/hooks/useUser";
 import { signOut } from "@/lib/api";
 
@@ -15,7 +16,14 @@ import ReservedSeatingProfile from "./ReservedSeatingProfile";
 
 export default function Account() {
   const { user } = useUser();
+  const [deleteAccount] = useDeleteAccount();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    await deleteAccount();
+    // After deletion, sign out and redirect to home
+    signOut("/");
+  };
 
   return (
     <div className={profileStyles.contentInner}>
@@ -67,6 +75,7 @@ export default function Account() {
       <DeleteAccountDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteAccount}
       />
     </div>
   );

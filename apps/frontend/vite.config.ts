@@ -11,6 +11,8 @@ const require = createRequire(import.meta.url);
 const reactIsRoot = dirname(require.resolve("react-is/package.json"));
 
 export default defineConfig({
+  // Load VITE_* from the monorepo root `.env` (same file as backend).
+  envDir: resolve(__dirname, "../.."),
   server: {
     host: true,
     port: 3000,

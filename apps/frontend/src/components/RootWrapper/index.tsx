@@ -2,13 +2,13 @@ import { useEffect } from "react";
 
 import { Outlet, ScrollRestoration, useLocation } from "react-router-dom";
 
-// Disabled for public laptop/tunnel hosting — re-enable for local-only work.
-// import DevAuthBanner from "@/components/DevAuthBanner";
+import DevAuthBanner from "@/components/DevAuthBanner";
+import RouteTracker from "@/components/RouteTracker";
 import {
   useAllRouteRedirects,
   useIncrementRouteRedirectClick,
 } from "@/hooks/api/route-redirect";
-import RouteTracker from "@/components/RouteTracker";
+import { isDevAuthUiEnabled } from "@/utils/devAuth";
 
 // Module-level tracking to prevent duplicate increments
 let lastIncrementedPath: string | null = null;
@@ -53,7 +53,7 @@ export default function RootWrapper() {
   return (
     <>
       <RouteTracker />
-      {/* {import.meta.env.DEV && <DevAuthBanner />} */}
+      {isDevAuthUiEnabled() && <DevAuthBanner />}
       <ScrollRestoration />
       <Outlet />
     </>
