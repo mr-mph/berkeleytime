@@ -1,0 +1,64 @@
+// Floor-plan SVG parts — colored by the card's --accent plus theme tokens.
+
+.planIcon {
+  width: min(82%, 230px);
+  height: 118px;
+}
+
+.wall {
+  fill: none;
+  stroke: var(--label-color);
+  stroke-width: 2;
+}
+
+.window {
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.bed,
+.desk {
+  fill: var(--accent);
+  fill-opacity: 0.11;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.pillow {
+  fill: var(--foreground-color);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.closet {
+  fill: var(--foreground-color);
+  stroke: var(--label-color);
+  stroke-width: 1.2;
+}
+
+.closetLine {
+  fill: none;
+  stroke: var(--label-color);
+  stroke-width: 1;
+}
+
+.appliance {
+  fill: var(--heading-color);
+  fill-opacity: 0.18;
+  stroke: var(--label-color);
+  stroke-width: 1;
+}
+
+.chair {
+  fill: var(--foreground-color);
+  stroke: var(--label-color);
+  stroke-width: 1.2;
+}
+
+.bunkMark {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
