@@ -166,7 +166,6 @@ export default function ReservedSeatingProfile() {
   );
 
   const handleUpdateSuggestions = async () => {
-    setStatusMessage(null);
     const result = await loadSuggestions({
       variables: { profile: profileInput },
     });
@@ -180,11 +179,6 @@ export default function ReservedSeatingProfile() {
         ...prev.filter((group) => !suggested.includes(group)),
       ];
     });
-    setStatusMessage(
-      suggested.length > 0
-        ? `Added ${suggested.length} group${suggested.length === 1 ? "" : "s"} that may apply (most similar first). Review and save.`
-        : "No matching groups found — search the list below or adjust your profile."
-    );
   };
 
   const handleSave = async () => {
