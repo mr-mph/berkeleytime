@@ -1,6 +1,9 @@
-# EECStime modifications
+# EECStime
 
-### searching:
+EECStime is a modified version of Berkeleytime focused on improving course discovery, enrollment planning, scheduling, and degree-requirement tracking for UC Berkeley students—especially EECS majors.
+
+## Modifications
+### Searching:
 
 - filter courses by eecs h/ss or ethics requirements
 - filter by more than one requirement at once
@@ -10,7 +13,7 @@
 - sort by A/A+ percent or # of ratings
 - search spring 2027 eecs listings
 
-### course listings:
+### Course Listings:
 
 - see university, l&s, and eecs requirements met
 - see ratemyprofesor ratings for each prof next to their name and a link to their rmp profile
@@ -19,28 +22,28 @@
 - see final exam time and date
 - get live enrollment info with refresh button
 
-### scheduler:
+### Scheduler:
 
 - allow grouping together of labs/discussions that share a timeslot in picker
 - show preview of finals week in the calendar view for a schedule
 - show enrollment info for each section on hover and with color-coding
 - allow switching between lectures of a course
 
-### grades:
+### Miscellaneous:
 
 - allow seeing # of grades for each bar rather than just percent
-
-### profile:
-
 - fill out your year/college/major to see what reserved seats groups you qualify for and save them to your profile
+- new 3d dorms feature allowing you to experiment with your dorm ahead of move-in day
 
-### bug fixes:
+### Bug Fixes:
 
 - save filters when closing and reopening course picker in scheduler
 - fix enrollment info for individual sections not showing on crosslistings of courses
 - fix the grades tab link to grades full page view
 - fix rating count inconsistencies across card, tab badge, and tab content
 - fix scrolling of course listing while in scheduler
+
+---
 
 # Berkeleytime
 
