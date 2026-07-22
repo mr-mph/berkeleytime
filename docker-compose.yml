@@ -89,6 +89,10 @@ services:
     networks:
       - bt
     restart: always
+    # Vite only exposes VITE_* from process env / local .env at startup.
+    # Without this, root .env flags like VITE_DISABLE_DEV_AUTH never reach the UI.
+    env_file:
+      - .env
     volumes:
       - ./apps/frontend:/frontend/apps/frontend
       - ./packages:/frontend/packages
