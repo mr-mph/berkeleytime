@@ -1,6 +1,6 @@
 # EECStime
 
-EECStime is a modified version of Berkeleytime focused on improving course discovery, enrollment planning, scheduling, and degree-requirement tracking for UC Berkeley students—especially EECS majors.
+EECStime is a modified version of Berkeleytime that improves course discovery, enrollment planning, scheduling, and more for UC Berkeley students.
 
 ## Modifications
 ### Searching:
