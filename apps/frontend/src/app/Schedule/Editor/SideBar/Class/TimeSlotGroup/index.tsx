@@ -12,6 +12,7 @@ import {
 } from "@/components/Capacity";
 import Time from "@/components/Time";
 import { IScheduleClass } from "@/lib/api";
+import { parseTime } from "@/lib/schedule/conflict";
 
 import styles from "./TimeSlotGroup.module.scss";
 
@@ -222,6 +223,38 @@ export function getSectionMeetingKey(section: GroupableSection): string {
   return `${daysKey}|${meeting.startTime ?? ""}|${meeting.endTime ?? ""}`;
 }
 
+function compareGroupsChronologically(
+  a: GroupableSection[],
+  b: GroupableSection[]
+): number {
+  const meetingA = getPrimaryMeeting(a[0]);
+  const meetingB = getPrimaryMeeting(b[0]);
+
+  const startA = meetingA?.startTime;
+  const startB = meetingB?.startTime;
+
+  // Unscheduled / TBD groups go last
+  if (!startA && !startB) return 0;
+  if (!startA) return 1;
+  if (!startB) return -1;
+
+  const startDiff = parseTime(startA) - parseTime(startB);
+  if (startDiff !== 0) return startDiff;
+
+  const endA = meetingA?.endTime;
+  const endB = meetingB?.endTime;
+  if (endA && endB) {
+    const endDiff = parseTime(endA) - parseTime(endB);
+    if (endDiff !== 0) return endDiff;
+  } else if (endA || endB) {
+    return endA ? -1 : 1;
+  }
+
+  const daysA = (meetingA?.days ?? []).map((day) => (day ? "1" : "0")).join("");
+  const daysB = (meetingB?.days ?? []).map((day) => (day ? "1" : "0")).join("");
+  return daysA.localeCompare(daysB);
+}
+
 export function groupSectionsByMeetingTime(
   sections: GroupableSection[]
 ): GroupableSection[][] {
@@ -232,5 +265,5 @@ export function groupSectionsByMeetingTime(
     if (existing) existing.push(section);
     else groups.set(key, [section]);
   }
-  return [...groups.values()];
+  return [...groups.values()].sort(compareGroupsChronologically);
 }
