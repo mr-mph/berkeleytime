@@ -13,6 +13,7 @@ export const rotationSliderDegrees = radians => {
   const normalized = ((raw % 360) + 360) % 360;
   return Math.abs(raw) > 1e-8 && Math.abs(normalized) < 1e-8 ? 360 : normalized;
 };
+export const rotateByKeyboardStep = radians => (radians + 3 * Math.PI / 180) % (Math.PI * 2);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 const PLANNER_CSS = `
@@ -503,7 +504,7 @@ export function createPlanner({
   }
   function pointerUp(e){if(!drag)return;e.preventDefault();e.stopImmediatePropagation();drag=null;onInteractionEnd();try{renderer.domElement.releasePointerCapture(e.pointerId)}catch{}scheduleSave()}
   renderer.domElement.addEventListener('pointerdown',pointerDown,true);renderer.domElement.addEventListener('pointermove',pointerMove,true);renderer.domElement.addEventListener('pointerup',pointerUp,true);renderer.domElement.addEventListener('pointercancel',pointerUp,true);
-  const onKeyDown=e=>{if(e.key==='Escape'&&placing){e.preventDefault();remove(placing);toast('Placement canceled');return}if((e.key==='Delete'||e.key==='Backspace')&&selected&&!selected.builtin&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){e.preventDefault();remove(selected)}if(e.key.toLowerCase()==='r'&&selected&&selected.mount!=='wall'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){selected.rotation=(selected.rotation+THREE.MathUtils.degToRad(15))%(Math.PI*2);clampInstance(selected);refreshSelection();scheduleSave()}};
+  const onKeyDown=e=>{if(e.key==='Escape'&&placing){e.preventDefault();remove(placing);toast('Placement canceled');return}if((e.key==='Delete'||e.key==='Backspace')&&selected&&!selected.builtin&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){e.preventDefault();remove(selected)}if(e.key.toLowerCase()==='r'&&selected&&selected.mount!=='wall'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){selected.rotation=rotateByKeyboardStep(selected.rotation);clampInstance(selected);refreshSelection();scheduleSave()}};
   addEventListener('keydown',onKeyDown);
 
   function updateOverlay(){if(!selected||(selected.pendingPlacement&&!selected.group.visible)){$('measureTag').style.display='none';return}const p=new THREE.Vector3(selected.x,selected.y+selected.dimensions.h+.16,selected.z);root.localToWorld(p);p.project(camera);const rect=renderer.domElement.getBoundingClientRect(),hostRect=container.getBoundingClientRect(),visible=p.z<1&&p.x>-1.2&&p.x<1.2&&p.y>-1.2&&p.y<1.2;$('measureTag').style.display=visible?'block':'none';$('measureTag').style.left=`${rect.left-hostRect.left+(p.x*.5+.5)*rect.width}px`;$('measureTag').style.top=`${rect.top-hostRect.top+(-p.y*.5+.5)*rect.height}px`;$('measureTag').textContent=`${fmtIn(selected.dimensions.w)} × ${fmtIn(selected.dimensions.d)} × ${fmtIn(selected.dimensions.h)}${selected.y>0?` · ${fmtIn(selected.y)} up`:''}`}

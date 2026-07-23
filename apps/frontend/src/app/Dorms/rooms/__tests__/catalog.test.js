@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ITEM_CATALOG, CATALOG_BY_ID, ITEM_SPEC_SCHEMA, catalogItemSpec, validateItemSpec } from '../catalog.js';
-import { rotationSliderDegrees } from '../planner.js';
+import { rotateByKeyboardStep, rotationSliderDegrees } from '../planner.js';
 
 describe('catalog integrity', () => {
   it('offers at least 200 measured items', () => {
@@ -52,6 +52,18 @@ describe('rotationSliderDegrees', () => {
 
   it('still displays zero for an untouched rotation', () => {
     expect(rotationSliderDegrees(0)).toBe(0);
+  });
+});
+
+describe('rotateByKeyboardStep', () => {
+  it('rotates three degrees for each R keydown', () => {
+    expect(rotationSliderDegrees(rotateByKeyboardStep(0))).toBeCloseTo(3, 10);
+  });
+
+  it('supports repeated keydowns without leaving the rotation range', () => {
+    let rotation = 0;
+    for (let i = 0; i < 121; i++) rotation = rotateByKeyboardStep(rotation);
+    expect(rotationSliderDegrees(rotation)).toBeCloseTo(3, 10);
   });
 });
 
