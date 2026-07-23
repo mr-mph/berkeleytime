@@ -50,7 +50,10 @@ export default function RoomViewer() {
   } = useQuery(GetDormRoomLayoutDocument, {
     variables: { roomId: persistedRoomId ?? DormRoomId.Blackwell },
     skip: userLoading || !shouldReadLayout,
-    fetchPolicy: "network-only",
+    // A saved layout is written into this query's cache by the mutation below.
+    // Reusing it keeps route-to-route navigation from racing a just-finished save.
+    // On a full page load the cache is empty, so the account copy is still fetched.
+    fetchPolicy: "cache-first",
   });
   const [saveDormRoomLayout] = useMutation(SaveDormRoomLayoutDocument);
   const persistenceLoading = userLoading || (shouldReadLayout && layoutLoading);
@@ -60,6 +63,18 @@ export default function RoomViewer() {
       if (!user || !persistedRoomId) return;
       void saveDormRoomLayout({
         variables: { roomId: persistedRoomId, layout },
+        optimisticResponse: {
+          saveDormRoomLayout: layout,
+        },
+        update: (cache, { data }) => {
+          cache.writeQuery({
+            query: GetDormRoomLayoutDocument,
+            variables: { roomId: persistedRoomId },
+            data: {
+              dormRoomLayout: data?.saveDormRoomLayout ?? layout,
+            },
+          });
+        },
       }).catch((mutationError: unknown) => {
         console.error("Failed to save room layout", mutationError);
       });
