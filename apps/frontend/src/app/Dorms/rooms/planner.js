@@ -290,7 +290,7 @@ export function createPlanner({
     group.userData.plannerInstanceId=instance.instanceId;root.add(group);items.push(instance);rebuild(instance);
     if(instance.mount==='wall')mountToWall(instance,instance.wall);else applyTransform(instance);
     group.visible=!pendingPlacement;
-    select(instance);scheduleSave();return instance;
+    select(instance);if(!pendingPlacement)scheduleSave();return instance;
   }
 
   function registerBuiltin(def){
@@ -373,6 +373,9 @@ export function createPlanner({
   function decodeLayout(value){const binary=atob(value.replace(/-/g,'+').replace(/_/g,'/'));return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0))))}
   function saveLayout(){const url=new URL(location.href),payload=layoutPayload(),encoded=payload.i.length?encodeLayout(payload):null;if(encoded)url.searchParams.set('layout',encoded);else url.searchParams.delete('layout');history.replaceState(history.state,'',url);try{onLayoutChange(encoded)}catch(e){console.warn('Unable to persist room layout',e)}}
   function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=0;saveLayout()},80)}
+  function flushPendingSave(){if(!saveTimer)return;clearTimeout(saveTimer);saveTimer=0;saveLayout()}
+  function onVisibilityChange(){if(document.visibilityState==='hidden')flushPendingSave()}
+  addEventListener('pagehide',flushPendingSave);document.addEventListener('visibilitychange',onVisibilityChange);
   function loadLayout(raw){
     if(!raw)return;
     // Shared links are untrusted: finite-guard coordinates (fall back to room center)
@@ -516,8 +519,9 @@ export function createPlanner({
   function dispose(){
     plDisposed=true;modelRequestId++;
     removeEventListener('keydown',onKeyDown);
+    removeEventListener('pagehide',flushPendingSave);document.removeEventListener('visibilitychange',onVisibilityChange);
     renderer.domElement.removeEventListener('pointerdown',pointerDown,true);renderer.domElement.removeEventListener('pointermove',pointerMove,true);renderer.domElement.removeEventListener('pointerup',pointerUp,true);renderer.domElement.removeEventListener('pointercancel',pointerUp,true);
-    if(saveTimer){clearTimeout(saveTimer);saveTimer=0;saveLayout()}clearTimeout(keyDebounce);clearTimeout(toast.timer);
+    flushPendingSave();clearTimeout(keyDebounce);clearTimeout(toast.timer);
     container.classList.remove('planner-open');
     shell.remove();style.remove();
   }

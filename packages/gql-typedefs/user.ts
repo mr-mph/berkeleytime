@@ -49,7 +49,9 @@ export const userTypeDef = gql`
 
   type Query {
     user: User @auth
-    dormRoomLayout(roomId: DormRoomId!): String @auth
+    dormRoomLayout(roomId: DormRoomId!): String
+      @auth
+      @cacheControl(maxAge: 0, scope: PRIVATE)
   }
 
   input UpdateUserInput {
