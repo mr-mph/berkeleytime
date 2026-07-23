@@ -719,6 +719,46 @@ export const updateCatalogRatings = async (
 };
 
 /**
+ * Sync Berkeleytime rating sort fields (avg / count) + aggregatedRatings onto
+ * catalog_classes for every term that has catalog rows. Needed after public
+ * backup merges, which often restore catalog without these denormalized fields.
+ */
+export const updateCatalogRatingsForAllCatalogTerms = async (
+  log: Config["log"]
+) => {
+  const terms = await CatalogClassModel.aggregate<{
+    year: number;
+    semester: string;
+  }>([
+    {
+      $group: {
+        _id: { year: "$year", semester: "$semester" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        year: "$_id.year",
+        semester: "$_id.semester",
+      },
+    },
+    { $sort: { year: -1, semester: 1 } },
+  ]);
+
+  if (terms.length === 0) {
+    log.warn("No catalog terms found; skipping catalog ratings sync");
+    return;
+  }
+
+  log.info(
+    `Syncing Berkeleytime rating sort fields for ${terms.length} catalog term(s)`
+  );
+  for (const term of terms) {
+    await updateCatalogRatings(log, term.year, term.semester);
+  }
+};
+
+/**
  * Updates denormalized all-time grade summary fields on catalog_classes.
  * Uses courseId joins so we can refresh grades without rebuilding the catalog.
  */

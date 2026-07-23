@@ -10,6 +10,8 @@ import { model, Schema } from "mongoose";
 import { Config } from "../shared/config";
 import {
   syncCatalogEnrollmentForAllCatalogTerms,
+  updateCatalogGradeSummaries,
+  updateCatalogRatingsForAllCatalogTerms,
   updateCatalogRmpRatings,
 } from "../lib/catalog-denormalize";
 import {
@@ -17,6 +19,7 @@ import {
   snapshotEecsTimeProtectedData,
 } from "../lib/eecsTimeUserBackup";
 import { syncCrosslistingEnrollmentFanout } from "./crosslisting-enrollment-fanout";
+import { rebuildCourseGradeSummaries } from "./grade-distributions";
 
 const PUBLIC_BACKUP_BASE =
   "https://backups.berkeleytime.com/public/daily/prod_public_backup";
@@ -548,8 +551,15 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
       log
     );
 
-    // Recompute denormalized RMP on catalog_classes from our local professor cache
-    // (backup catalog rows often lack / stale rmp* fields).
+    // Backup catalog_classes often lack denormalized sort fields. Rebuild them
+    // from source collections that are in the dump (grades, aggregated metrics)
+    // plus local RMP cache (nsExcluded / snapshotted).
+    log.info("Recomputing course grade summaries (incl. A/A+ percent)");
+    await rebuildCourseGradeSummaries(log);
+    log.info("Syncing grade summaries onto catalog_classes");
+    await updateCatalogGradeSummaries(log);
+    log.info("Syncing Berkeleytime rating sort fields onto catalog_classes");
+    await updateCatalogRatingsForAllCatalogTerms(log);
     log.info("Re-applying RMP averages onto catalog_classes from local cache");
     await updateCatalogRmpRatings(log);
 
@@ -564,7 +574,7 @@ const syncEnrollmentFromPublicBackupLocked = async (config: Config) => {
           lastBackupDate: dateKey,
           lastEtag: etag,
           lastRestoredAt: new Date(),
-          message: `Restored public backup ${dateKey} (--drop); protected ${eecsProtection.userIds.length} EECSTime user(s); migrated GradTrak/ratings/reviews for non-EECSTime users; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog enrollment + RMP`,
+          message: `Restored public backup ${dateKey} (--drop); protected ${eecsProtection.userIds.length} EECSTime user(s); migrated GradTrak/ratings/reviews for non-EECSTime users; ${draftReseeded ? "reseeded Spring 2027 draft; " : ""}synced catalog sort fields (grades, BT ratings, RMP) + enrollment`,
         },
       },
       { upsert: true }

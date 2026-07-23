@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 import {
   syncCatalogEnrollmentForAllCatalogTerms,
   updateCatalogGradeSummaries,
+  updateCatalogRatingsForAllCatalogTerms,
 } from "./lib/catalog-denormalize";
 import articulationsPuller from "./pullers/articulations";
 import classesPuller from "./pullers/classes";
@@ -12,7 +13,9 @@ import enrollmentFromPublicBackupPuller from "./pullers/enrollment-from-public-b
 import enrollmentHistoriesPuller from "./pullers/enrollment";
 import enrollmentTimeframePuller from "./pullers/enrollment-timeframe";
 import crosslistingEnrollmentFanoutPuller from "./pullers/crosslisting-enrollment-fanout";
-import gradeDistributionsPuller from "./pullers/grade-distributions";
+import gradeDistributionsPuller, {
+  rebuildCourseGradeSummaries,
+} from "./pullers/grade-distributions";
 import migrationsPuller from "./pullers/migrations";
 import rateMyProfessorsPuller from "./pullers/ratemyprofessors";
 import sectionsPuller from "./pullers/sections";
@@ -26,6 +29,13 @@ const cliArgs = {
     type: "string" as const,
   },
 } as const;
+
+/** Rebuild denormalized catalog sort fields from source collections. */
+const syncCatalogSortFields = async (config: Config) => {
+  await rebuildCourseGradeSummaries(config.log);
+  await updateCatalogGradeSummaries(config.log);
+  await updateCatalogRatingsForAllCatalogTerms(config.log);
+};
 
 const pullerMap: {
   [key: string]: (config: Config, ...arg: any) => Promise<unknown>;
@@ -51,6 +61,7 @@ const pullerMap: {
     migrationsPuller.backfillAggregatedMetricsClassId,
   "catalog-sync-grades": async (config: Config) =>
     updateCatalogGradeSummaries(config.log),
+  "catalog-sync-sort-fields": syncCatalogSortFields,
   "catalog-sync-enrollment": async (config: Config) => {
     await syncCatalogEnrollmentForAllCatalogTerms(config.log);
     const url = new URL("/api/cache/invalidate-catalog", config.BACKEND_URL);
