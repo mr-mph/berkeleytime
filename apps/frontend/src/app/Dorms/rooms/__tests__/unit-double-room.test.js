@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  BOOKCASE, CLOSET, CURTAIN, DESK, EYE, FRIDGE, LAYOUT, RADIATOR, ROOM, WINDOW,
+  BED, BOOKCASE, CLOSET, CURTAIN, DESK, EYE, FRIDGE, LAYOUT, RADIATOR, ROOM, WINDOW,
 } from '../unit-double/spec.js';
 import { HOP_MARGIN, constrainToRoom, createJumpState, queueJump, stepJump } from '../walk-physics.js';
 
@@ -80,6 +80,16 @@ describe('unit double desks and chairs', () => {
 
   it('keeps the window desk chair on the left side', () => {
     expect(LAYOUT.chairLeft.x).toBeLessThan(LAYOUT.deskLeft.x);
+  });
+});
+
+describe('unit double beds', () => {
+  const drawerFaceWorldX = bed => bed.x + Math.sin(bed.rotY) * (bed.drawerSide === 'far' ? BED.W : 0);
+  const bedCenterWorldX = bed => bed.x + Math.cos(bed.rotY) * BED.L / 2 + Math.sin(bed.rotY) * BED.W / 2;
+
+  it('faces both under-bed drawer banks toward the room interior', () => {
+    expect(drawerFaceWorldX(LAYOUT.bedLeft)).toBeGreaterThan(bedCenterWorldX(LAYOUT.bedLeft));
+    expect(drawerFaceWorldX(LAYOUT.bedRight)).toBeLessThan(bedCenterWorldX(LAYOUT.bedRight));
   });
 });
 
